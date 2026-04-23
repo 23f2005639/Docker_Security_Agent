@@ -1,0 +1,30 @@
+engine:
+  kind: modern_ebpf
+
+json_output: true
+log_stderr: true
+log_syslog: false
+priority: debug
+buffered_outputs: false
+
+plugins:
+  - name: container
+    library_path: libcontainer.so
+    init_config:
+      with_size: false
+
+load_plugins: [container]
+
+# Points to sentinel-app container hostname (not localhost — inside Docker network)
+http_output:
+  enabled: true
+  url: http://sentinel-app:8765/api/falco/events
+  user_agent: "falcosecurity/falco"
+
+stdout_output:
+  enabled: true
+
+rules_files:
+  - /etc/falco/falco_rules.yaml
+  - /etc/falco/falco_rules.local.yaml
+  - /etc/falco/rules.d/sentinel_rules.yaml

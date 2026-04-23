@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-multipart
+websockets
+pydantic
+openai-agents>=0.0.3
+httpx
+python-dotenv

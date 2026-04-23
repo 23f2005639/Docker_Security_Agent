@@ -1,0 +1,16 @@
+.env
+.env.local
+__pycache__/
+*.py[cod]
+*.pyo
+reports/
+*.log
+.DS_Store
+docker/falco-vm/*.qcow2
+docker/falco-vm/*.img
+docker/falco-vm/*.iso
+*.egg-info/
+dist/
+build/
+deploy/ssl/
+deploy/.htpasswd

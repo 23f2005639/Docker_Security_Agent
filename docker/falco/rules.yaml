@@ -1,0 +1,201 @@
+# Container Sentinel - Custom Falco Detection Rules
+# One rule per attack scenario
+
+- rule: Sentinel - Docker Socket Abuse
+  desc: Detects a container connecting to the Docker socket (docker_socket attack)
+  condition: >
+    container and
+    evt.type = connect and
+    fd.name = /var/run/docker.sock
+  output: >
+    Docker socket connection from container
+    (container=%container.name image=%container.image.repository
+     user=%user.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, docker, privilege_escalation]
+
+- rule: Sentinel - Shell in Privileged Container
+  desc: Detects shell spawned inside a privileged container (nsenter_escape attack)
+  condition: >
+    spawned_process and
+    container and
+    container.privileged = true and
+    proc.name in (sh, bash, ash, dash, zsh)
+  output: >
+    Shell spawned in privileged container
+    (container=%container.name image=%container.image.repository
+     shell=%proc.name parent=%proc.pname cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, shell, privilege_escalation]
+
+- rule: Sentinel - Redis Lateral Movement
+  desc: Detects a non-redis container making outbound connections to Redis port (lateral_redis attack)
+  condition: >
+    outbound and
+    container and
+    fd.sport != 6379 and
+    fd.rport = 6379 and
+    container.name != redis-target
+  output: >
+    Outbound Redis connection from unexpected container
+    (container=%container.name image=%container.image.repository
+     src=%fd.cip:%fd.sport dst=%fd.sip:%fd.rport cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [container, network, lateral_movement]
+
+- rule: Sentinel - Suspicious Write in Container Root FS
+  desc: Detects writes to root filesystem or /proc/self (runc_cve attack)
+  condition: >
+    open_write and
+    container and
+    (fd.name startswith /proc/self or
+     fd.name = / or
+     (fd.directory = / and not fd.name in (/tmp, /var, /run, /dev)))
+  output: >
+    Suspicious write to container root filesystem
+    (container=%container.name image=%container.image.repository
+     file=%fd.name user=%user.name cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [container, filesystem, cve]
+
+- rule: Sentinel - AuthZ Bypass via Docker HTTP API
+  desc: >
+    Detects curl or python making direct HTTP calls to the Docker daemon socket
+    from inside a container — the exact technique used in CVE-2026-34040 to bypass
+    AuthZ plugins by sending an oversized POST body (>1 MB). Distinct from docker
+    CLI socket abuse (Attack I) because the process is an HTTP client, not dockerd.
+  condition: >
+    container and
+    evt.type = connect and
+    fd.name = /var/run/docker.sock and
+    proc.name in (curl, python3, python, python2, wget)
+  output: >
+    HTTP client accessing Docker daemon API via socket — CVE-2026-34040 AuthZ bypass
+    (container=%container.name image=%container.image.repository
+     client=%proc.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, docker, authz_bypass, cve_2026_34040, T1611]
+
+# ── DoS Detection Rules ─────────────────────────────────────────────────────
+
+- rule: Sentinel - CPU Exhaustion Process Detected
+  desc: Detects `yes` command spinning inside a container — classic CPU exhaustion DoS
+  condition: >
+    spawned_process and container and
+    proc.name = yes
+  output: >
+    CPU exhaustion process detected in container
+    (container=%container.name image=%container.image.repository
+     proc=%proc.name parent=%proc.pname cmdline=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [container, dos, cpu_exhaustion, T1499]
+
+- rule: Sentinel - Abnormal Process Spawn Rate
+  desc: >
+    Detects shell spawning a flood of background sleep processes — fork-bomb
+    class DoS where pids.max is unlimited on the container.
+  condition: >
+    spawned_process and container and
+    proc.name = sleep and
+    proc.pname in (sh, bash, ash, dash) and
+    container.name = flask-target
+  output: >
+    Abnormal sleep-process flood in container (fork-bomb class)
+    (container=%container.name image=%container.image.repository
+     proc=%proc.name parent=%proc.pname pid=%proc.pid cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, dos, fork_bomb, process_flood, T1499]
+
+- rule: Sentinel - HTTP Flood Outbound
+  desc: >
+    Detects curl spawned in rapid succession from attacker container —
+    application-layer HTTP flood targeting internal services.
+  condition: >
+    spawned_process and container and
+    proc.name = curl and
+    container.name = attacker
+  output: >
+    HTTP flood: curl burst from attacker container
+    (container=%container.name image=%container.image.repository
+     proc=%proc.name parent=%proc.pname cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [container, dos, http_flood, T1499]
+
+# ── Supply Chain Detection Rules ─────────────────────────────────────────────
+
+- rule: Sentinel - Supply Chain Backdoor Write
+  desc: >
+    Detects writes to critical executable paths inside a container with a writable
+    root filesystem — the persistence mechanism for a supply chain backdoor injection.
+  condition: >
+    open_write and
+    container and
+    (fd.name startswith /usr/local/bin/ or
+     fd.name startswith /usr/bin/ or
+     fd.name startswith /usr/sbin/ or
+     fd.name startswith /etc/cron or
+     fd.name startswith /etc/profile.d/)
+  output: >
+    Supply chain backdoor write to critical path in container
+    (container=%container.name image=%container.image.repository
+     file=%fd.name user=%user.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, supply_chain, backdoor, T1195]
+
+- rule: Sentinel - Typosquatted Package Install
+  desc: >
+    Detects pip installing a known typosquatted or dependency-confusion package name —
+    supply chain attack via malicious lookalike package on PyPI.
+  condition: >
+    spawned_process and
+    container and
+    proc.name in (pip, pip3, pip2) and
+    (proc.cmdline contains "setup-tools" or
+     proc.cmdline contains "urllib4" or
+     proc.cmdline contains "requestes" or
+     proc.cmdline contains "djang" or
+     proc.cmdline contains "coloramma" or
+     proc.cmdline contains "boto " or
+     proc.cmdline contains "nump ")
+  output: >
+    Suspicious pip install — possible typosquatted package (supply chain attack)
+    (container=%container.name image=%container.image.repository
+     proc=%proc.name cmdline=%proc.cmdline user=%user.name)
+  priority: CRITICAL
+  tags: [container, supply_chain, dependency_confusion, T1195]
+
+- rule: Sentinel - Outbound Beacon from Container
+  desc: >
+    Detects unexpected outbound HTTP/HTTPS connections from non-attacker containers —
+    a supply chain backdoor exfiltrating secrets on startup.
+  condition: >
+    outbound and
+    container and
+    container.name != attacker and
+    fd.rport in (80, 443, 8080, 4444, 9001) and
+    proc.name in (curl, wget, python3, python, sh, bash)
+  output: >
+    Unexpected outbound beacon from container — possible supply chain exfiltration
+    (container=%container.name image=%container.image.repository
+     proc=%proc.name dst=%fd.rip:%fd.rport cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [container, supply_chain, exfiltration, T1195]
+
+# ── Existing Rules ───────────────────────────────────────────────────────────
+
+- rule: Sentinel - Host Filesystem Read via Privileged Container
+  desc: >
+    Detects a process reading files under /hostroot inside a privileged container —
+    post-exploitation outcome of CVE-2026-34040 where the attacker mounts the host
+    root filesystem and exfiltrates credentials such as /etc/shadow.
+  condition: >
+    open_read and
+    container and
+    container.privileged = true and
+    fd.name startswith /hostroot
+  output: >
+    Host filesystem read from privileged container — CVE-2026-34040 post-exploitation
+    (container=%container.name image=%container.image.repository
+     file=%fd.name user=%user.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, docker, host_access, cve_2026_34040, T1611]

@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Sentinel — Security Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ── Variables ─────────────────────────────────────────────── */
+:root {
+  --bg:         #EDF0F5;
+  --bg-mid:     #F8FAFB;
+  --bg-card:    #FFFFFF;
+  --bg-card2:   #F4F7FA;
+  --border:     #DDE3EB;
+  --border-hi:  #C0CEDC;
+  --sidebar-w:  224px;
+  --topbar-h:   58px;
+
+  --atk:        #059669;
+  --atk-dim:    rgba(5,150,105,.08);
+  --atk-glow:   rgba(5,150,105,.22);
+
+  --falco:      #0284C7;
+  --falco-dim:  rgba(2,132,199,.08);
+  --falco-glow: rgba(2,132,199,.22);
+
+  --red:        #DC2626;
+  --red-dim:    rgba(220,38,38,.08);
+  --orange:     #EA580C;
+  --amber:      #D97706;
+  --amber-dim:  rgba(217,119,6,.09);
+
+  --text:       #0F172A;
+  --muted:      #334155;
+  --dim:        #64748B;
+
+  --ff-brand: 'Orbitron', sans-serif;
+  --ff-b:     'Rajdhani', sans-serif;
+  --ff-m:     'Share Tech Mono', monospace;
+  --r: 6px;
+  --rl: 10px;
+}
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--ff-b);font-size:15px;color:var(--text);background:var(--bg);line-height:1.55;}
+
+/* dot-grid background */
+body{
+  background-image:
+    radial-gradient(ellipse 60% 50% at 15% 80%, rgba(2,132,199,.05) 0, transparent 100%),
+    radial-gradient(ellipse 50% 40% at 85% 10%, rgba(5,150,105,.04) 0, transparent 100%),
+    radial-gradient(circle at 1px 1px, rgba(100,116,139,.12) 1px, transparent 0);
+  background-size: auto, auto, 28px 28px;
+}
+
+/* subtle texture overlay */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.012) 3px,rgba(0,0,0,.012) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:3px;}
+
+/* ── Layout ────────────────────────────────────────────────── */
+.app{display:flex;height:100vh;overflow:hidden;}
+
+/* ── Sidebar ───────────────────────────────────────────────── */
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);height:100vh;
+  background:var(--bg-mid);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;z-index:50;
+  position:relative;box-shadow:2px 0 8px rgba(0,0,0,.06);
+}
+.sidebar::after{
+  content:'';position:absolute;top:0;right:0;width:1px;height:100%;
+  background:linear-gradient(180deg,transparent 0%,var(--falco) 35%,var(--atk) 65%,transparent 100%);
+  opacity:.22;pointer-events:none;
+}
+
+.sb-brand{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
+.sb-logo-row{display:flex;align-items:center;gap:11px;margin-bottom:0;}
+.sb-logo{
+  width:34px;height:34px;border:1px solid rgba(2,132,199,.25);border-radius:7px;
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(2,132,199,.1),rgba(5,150,105,.07));
+}
+.sb-logo::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(2,132,199,.2),rgba(5,150,105,.12));
+  animation:logoBreathe 4s ease-in-out infinite;
+}
+@keyframes logoBreathe{0%,100%{opacity:.5}50%{opacity:1}}
+
+.sb-name{font-family:var(--ff-brand);font-size:12px;font-weight:700;color:var(--text);letter-spacing:.1em;line-height:1.3;}
+.sb-sub{font-size:10px;font-family:var(--ff-m);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px;opacity:.9;}
+
+.sb-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;}
+.sb-grp{font-family:var(--ff-m);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--falco);padding:14px 18px 4px;opacity:.7;}
+.sb-item{
+  display:flex;align-items:center;gap:9px;padding:9px 18px;
+  color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all .18s ease;border-left:2px solid transparent;letter-spacing:.02em;
+}
+.sb-item:hover{background:rgba(2,132,199,.06);color:var(--text);border-left-color:var(--border-hi);text-decoration:none;}
+.sb-item.active{background:rgba(2,132,199,.1);color:var(--falco);border-left-color:var(--falco);}
+.sb-item .si{font-size:12px;width:16px;text-align:center;flex-shrink:0;}
+.sb-item .ext{margin-left:auto;font-size:9px;opacity:.3;}
+.sb-dot{margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--border-hi);flex-shrink:0;transition:all .4s;}
+.sb-dot.on{background:var(--atk);box-shadow:0 0 8px var(--atk-glow);animation:breathe 2.5s ease-in-out infinite;}
+.sb-dot.run{background:var(--amber);box-shadow:0 0 8px rgba(255,183,0,.4);animation:breathe 1s ease-in-out infinite;}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+
+.sb-sep{height:1px;background:var(--border);margin:6px 18px;}
+.sb-footer{padding:14px 18px;border-top:1px solid var(--border);flex-shrink:0;}
+.sb-conn-lbl{font-family:var(--ff-m);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;}
+.sb-cr{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;color:var(--muted);font-family:var(--ff-m);letter-spacing:.04em;}
+.cr-dot{width:5px;height:5px;border-radius:50%;background:var(--border-hi);transition:all .4s;flex-shrink:0;}
+.cr-dot.on{background:var(--atk);box-shadow:0 0 6px rgba(0,232,122,.5);}
+
+/* ── Main ──────────────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+
+/* ── Topbar ────────────────────────────────────────────────── */
+.topbar{
+  height:var(--topbar-h);background:var(--bg-mid);border-bottom:1px solid var(--border);
+  padding:0 22px;display:flex;align-items:center;gap:14px;flex-shrink:0;z-index:40;
+  position:relative;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.04);
+}
+/* animated sweep line */
+.topbar::before{
+  content:'';position:absolute;top:0;left:-40%;width:30%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--falco),transparent);
+  animation:topSweep 8s linear infinite;opacity:.35;
+}
+@keyframes topSweep{0%{left:-40%}100%{left:140%}}
+
+.tb-title{font-family:var(--ff-brand);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.12em;}
+.tb-sep{color:var(--border-hi);}
+.tb-sub{font-size:13px;color:var(--muted);font-family:var(--ff-m);letter-spacing:.04em;}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+
+.ws-chip{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--ff-m);font-size:11px;
+  font-weight:600;padding:3px 11px;border-radius:4px;border:1px solid var(--border);
+  color:var(--muted);background:transparent;transition:all .25s;letter-spacing:.06em;
+}
+.ws-chip::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--dim);transition:all .25s;}
+.ws-chip.live{color:var(--atk);border-color:rgba(0,232,122,.25);}
+.ws-chip.live::before{background:var(--atk);box-shadow:0 0 6px var(--atk-glow);animation:breathe 2s infinite;}
+
+.env-chip{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--ff-m);font-size:11px;
+  font-weight:600;letter-spacing:.06em;padding:4px 12px;border-radius:4px;
+  background:var(--amber-dim);border:1px solid rgba(217,119,6,.3);color:var(--amber);
+}
+.tb-clock{font-family:var(--ff-m);font-size:12px;color:var(--muted);padding-left:12px;border-left:1px solid var(--border);letter-spacing:.04em;}
+
+/* ── Content ───────────────────────────────────────────────── */
+.content{flex:1;overflow-y:auto;padding:18px 20px;background:transparent;}
+
+/* ── Section Header ────────────────────────────────────────── */
+.sh{
+  display:flex;align-items:center;gap:9px;
+  font-family:var(--ff-brand);font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.2em;color:var(--falco);margin-bottom:13px;margin-top:2px;
+}
+.sh::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border) 0%,transparent 80%);}
+
+/* ── Overview ──────────────────────────────────────────────── */
+.ov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.ov-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--rl);
+  padding:16px 18px 14px;position:relative;overflow:hidden;
+  transition:border-color .25s, transform .2s;
+}
+.ov-card:hover{border-color:var(--border-hi);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.ov-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:var(--rl) var(--rl) 0 0;}
+.c-green::before{background:var(--atk);  box-shadow:0 0 14px rgba(0,232,122,.4);}
+.c-red::before  {background:var(--red);  box-shadow:0 0 14px rgba(255,45,85,.4);}
+.c-falco::before{background:var(--falco);box-shadow:0 0 14px rgba(0,200,255,.4);}
+.c-amber::before{background:var(--amber);box-shadow:0 0 14px rgba(255,183,0,.4);}
+.ov-lbl{font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+.ov-val{font-family:var(--ff-brand);font-size:34px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-.02em;}
+.ov-sub{font-size:12px;color:var(--muted);margin-top:5px;font-family:var(--ff-m);}
+
+/* ── Card ──────────────────────────────────────────────────── */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.card.a-atk   {border-left:2px solid rgba(5,150,105,.5);}
+.card.a-falco {border-left:2px solid rgba(2,132,199,.5);}
+.card.a-red   {border-left:2px solid rgba(220,38,38,.5);}
+.card.a-amber {border-left:2px solid rgba(217,119,6,.5);}
+.card.a-cyan  {border-left:2px solid rgba(2,132,199,.5);}
+.card.a-green {border-left:2px solid rgba(5,150,105,.5);}
+
+.ch{
+  display:flex;align-items:center;gap:9px;padding:11px 17px;
+  border-bottom:1px solid var(--border);background:var(--bg-card2);
+}
+.ch-icon{font-size:15px;flex-shrink:0;}
+.ch-title{font-family:var(--ff-b);font-size:14px;font-weight:700;color:var(--text);letter-spacing:.06em;text-transform:uppercase;}
+.ch-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.chip-r{font-family:var(--ff-m);font-size:11px;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:4px;padding:2px 9px;letter-spacing:.04em;}
+
+/* ── Status Table ──────────────────────────────────────────── */
+.st{width:100%;border-collapse:collapse;}
+.st tr{border-bottom:1px solid var(--border);transition:background .15s;}
+.st tr:last-child{border-bottom:none;}
+.st tr:hover{background:rgba(255,255,255,.012);}
+.st td{padding:11px 17px;font-size:14px;}
+.st td:first-child{font-family:var(--ff-m);font-size:13px;color:var(--text);font-weight:500;}
+.st td:nth-child(2){font-family:var(--ff-m);font-size:12px;color:var(--muted);}
+
+.tag-running{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--ff-m);font-size:11px;
+  font-weight:600;letter-spacing:.06em;color:var(--atk);background:var(--atk-dim);
+  border:1px solid rgba(0,232,122,.22);border-radius:4px;padding:2px 8px;
+}
+.tag-running::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--atk);box-shadow:0 0 5px var(--atk-glow);animation:breathe 2s infinite;}
+.tag-stopped{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--ff-m);font-size:11px;
+  font-weight:600;letter-spacing:.06em;color:var(--muted);background:rgba(0,0,0,.03);
+  border:1px solid var(--border);border-radius:4px;padding:2px 8px;
+}
+.flag{
+  display:inline-block;font-family:var(--ff-m);font-size:10px;font-weight:700;padding:1px 5px;
+  border-radius:3px;background:var(--red-dim);border:1px solid rgba(255,45,85,.15);color:var(--red);
+  margin-left:5px;letter-spacing:.04em;
+}
+
+/* ── Attack Rows ───────────────────────────────────────────── */
+.ar{
+  display:flex;align-items:center;gap:15px;padding:13px 17px;
+  border-bottom:1px solid var(--border);transition:background .18s,box-shadow .18s;position:relative;
+}
+.ar:last-child{border-bottom:none;}
+.ar:hover{background:rgba(5,150,105,.04);box-shadow:inset 3px 0 0 rgba(5,150,105,.3);}
+.ar-num{
+  font-family:var(--ff-brand);font-size:18px;font-weight:700;color:var(--dim);
+  width:30px;text-align:center;flex-shrink:0;letter-spacing:-.01em;transition:color .2s;
+}
+.ar:hover .ar-num{color:var(--atk);}
+.ar-info{flex:1;min-width:0;}
+.ar-title{font-family:var(--ff-b);font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px;letter-spacing:.01em;}
+.ar-desc{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:3px;}
+.ar-status{font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--dim);}
+
+.btn-exec{
+  font-family:var(--ff-b);font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:#FFFFFF;background:var(--atk);border:none;border-radius:5px;padding:8px 18px;
+  cursor:pointer;flex-shrink:0;transition:all .18s;white-space:nowrap;position:relative;overflow:hidden;
+}
+.btn-exec::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18),transparent);opacity:0;transition:opacity .18s;}
+.btn-exec:hover{background:#047857;box-shadow:0 4px 18px var(--atk-glow);transform:translateY(-1px);}
+.btn-exec:hover::after{opacity:1;}
+.btn-exec:disabled{background:var(--border-hi);color:var(--dim);cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-exec.running{background:var(--orange);animation:execPulse 1.2s ease-in-out infinite;}
+@keyframes execPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,43,.55)}50%{box-shadow:0 0 0 9px rgba(255,107,43,0)}}
+
+/* ── Dual Panel ────────────────────────────────────────────── */
+.dp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.dp .card{margin-bottom:0;}
+
+/* Panel accent headers */
+.panel-atk .ch{background:rgba(5,150,105,.05);border-bottom-color:rgba(5,150,105,.18);}
+.panel-atk .ch-title{color:var(--atk);}
+.panel-falco .ch{background:rgba(2,132,199,.05);border-bottom-color:rgba(2,132,199,.18);}
+.panel-falco .ch-title{color:var(--falco);}
+
+/* ── Attack Log ────────────────────────────────────────────── */
+#output-box{
+  height:400px;overflow-y:auto;padding:14px 18px;
+  font-family:var(--ff-m);font-size:13px;line-height:1.8;
+  background:#F4FBF7;
+}
+.line-ok  {color:var(--muted);}
+.line-plus{color:var(--atk);font-weight:500;}
+.line-bang{color:var(--red);font-weight:500;}
+.line-cmd {color:var(--falco);}
+.line-ok.ne,.line-plus.ne,.line-bang.ne,.line-cmd.ne{animation:logSlide .22s ease-out;}
+@keyframes logSlide{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── Falco Box ─────────────────────────────────────────────── */
+#falco-box{
+  height:400px;overflow-y:auto;padding:12px 16px;
+  font-family:var(--ff-m);font-size:13px;
+  background:#F3F8FD;
+}
+#falco-empty{color:var(--muted);padding:22px 0;text-align:center;font-style:italic;font-size:13px;}
+
+.fr{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(2,132,199,.1);line-height:1.5;}
+.fr.ne{animation:falcoSlide .22s ease-out;}
+@keyframes falcoSlide{from{opacity:0;transform:translateX(7px)}to{opacity:1;transform:translateX(0)}}
+.fr.fc{animation:falcoSlide .22s ease-out, critFlash .7s 2;}
+@keyframes critFlash{0%,100%{background:transparent}50%{background:rgba(220,38,38,.07)}}
+
+.f-pri{font-weight:700;font-size:12px;letter-spacing:.06em;white-space:nowrap;padding-top:1px;}
+.f-critical{color:var(--red);}
+.f-warning {color:var(--amber);}
+.f-notice  {color:var(--falco);}
+.f-cont{color:var(--muted);white-space:nowrap;font-size:12px;}
+.f-rule{color:var(--text);word-break:break-all;font-size:12px;}
+
+.f-ai{display:flex;align-items:flex-start;gap:6px;padding:3px 0 7px 24px;font-size:12px;line-height:1.55;color:var(--muted);border-bottom:1px solid rgba(2,132,199,.1);}
+.f-ai.pending{font-style:italic;}
+.f-ai.done{color:var(--muted);}
+.f-ai-lbl{color:var(--amber);font-weight:700;flex-shrink:0;}
+.f-ai-sum{color:var(--text);}
+.f-ai-sep{color:var(--dim);margin:0 4px;}
+.f-ai-risk{color:var(--red);}
+.f-ai-act {color:var(--falco);}
+
+/* ── Buttons SM ────────────────────────────────────────────── */
+.btn-sm{
+  font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.06em;padding:4px 11px;
+  border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.btn-sm:hover{border-color:var(--border-hi);color:var(--text);}
+.btn-sm.primary{background:var(--falco-dim);border-color:rgba(0,200,255,.28);color:var(--falco);}
+.btn-sm.primary:hover{background:rgba(0,200,255,.14);}
+
+/* ── Falco Intel ───────────────────────────────────────────── */
+.card-body{padding:17px;}
+#falco-intel-status{display:flex;align-items:center;gap:8px;font-family:var(--ff-m);font-size:13px;color:var(--muted);padding:8px 0;}
+#falco-intel-status.done {color:var(--atk);}
+#falco-intel-status.error{color:var(--red);}
+.isg{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:16px;}
+.isc{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:4px;}
+.isc-lbl{font-family:var(--ff-m);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.isc-val{font-family:var(--ff-brand);font-size:22px;font-weight:700;color:var(--text);}
+.intel-threat-critical{font-family:var(--ff-brand);font-size:22px;font-weight:700;color:var(--red);}
+.intel-threat-high    {font-family:var(--ff-brand);font-size:22px;font-weight:700;color:var(--orange);}
+.intel-threat-medium  {font-family:var(--ff-brand);font-size:22px;font-weight:700;color:var(--amber);}
+.intel-threat-low     {font-family:var(--ff-brand);font-size:22px;font-weight:700;color:var(--atk);}
+.i-sect{margin-bottom:15px;}
+.i-sect-title{font-family:var(--ff-b);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+.i-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.i-tbl th{text-align:left;padding:6px 10px;font-family:var(--ff-m);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg);}
+.i-tbl td{padding:6px 10px;border-bottom:1px solid rgba(100,116,139,.12);font-family:var(--ff-m);font-size:12px;color:var(--text);}
+.i-rem{padding-left:15px;}
+.i-rem li{color:var(--muted);font-size:13px;margin-bottom:5px;line-height:1.55;}
+.i-sum{background:rgba(2,132,199,.05);border:1px solid rgba(2,132,199,.2);border-radius:6px;padding:12px 15px;font-size:13px;color:var(--muted);line-height:1.6;}
+.i-narr{font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;}
+
+/* FALCO RULE ROOT CAUSE ANALYSIS */
+.rca-rule-list{list-style:none;padding:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+.rca-rule-item{border-bottom:1px solid var(--border);}
+.rca-rule-item:last-child{border-bottom:none;}
+.rca-rule-hdr{display:flex;align-items:center;gap:8px;padding:10px 13px;cursor:pointer;transition:background .13s;user-select:none;}
+.rca-rule-hdr:hover{background:rgba(255,255,255,.04);}
+.rca-rule-hdr.open{background:rgba(220,38,38,.06);}
+.rca-rule-name{font-family:var(--ff-m);font-size:11.5px;font-weight:600;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rca-ttp{font-family:var(--ff-m);font-size:10px;color:var(--muted);flex-shrink:0;}
+.rca-urg{font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.07em;padding:2px 7px;border-radius:3px;flex-shrink:0;}
+.rca-urg-immediate{color:var(--red);background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);}
+.rca-urg-within-30-days{color:var(--amber);background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.25);}
+.rca-urg-routine{color:var(--atk);background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);}
+.rca-chev{font-size:10px;color:var(--muted);transition:transform .18s;flex-shrink:0;}
+.rca-rule-hdr.open .rca-chev{transform:rotate(180deg);}
+.rca-rule-body{display:none;padding:12px 13px;background:rgba(0,0,0,.18);border-top:1px solid var(--border);}
+.rca-rule-body.open{display:block;}
+.rca-field{margin-bottom:10px;}
+.rca-field:last-child{margin-bottom:0;}
+.rca-field-lbl{font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.rca-field-val{font-size:12.5px;color:var(--text);line-height:1.6;}
+.rca-cmd-box{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:5px;padding:8px 11px;margin-top:4px;}
+.rca-cmd{font-family:var(--ff-m);font-size:11px;color:#67e8f9;flex:1;word-break:break-all;}
+.rca-copy{font-family:var(--ff-m);font-size:9px;padding:3px 9px;border:1px solid rgba(103,232,249,.25);border-radius:3px;color:#67e8f9;background:rgba(103,232,249,.05);cursor:pointer;transition:all .13s;white-space:nowrap;flex-shrink:0;}
+.rca-copy:hover{background:rgba(103,232,249,.12);}
+.rca-copy.copied{color:var(--atk);border-color:rgba(5,150,105,.3);}
+.rca-compose-box{font-family:var(--ff-m);font-size:11px;color:var(--muted);background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:5px;padding:7px 11px;margin-top:4px;line-height:1.5;}
+
+/* ── Report btn ────────────────────────────────────────────── */
+.btn-report{
+  display:inline-flex;align-items:center;gap:8px;font-family:var(--ff-b);font-size:12px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:#FFFFFF;background:var(--atk);
+  border:none;border-radius:5px;padding:9px 18px;cursor:pointer;text-decoration:none;transition:all .18s;
+}
+.btn-report:hover{background:#047857;box-shadow:0 4px 18px var(--atk-glow);transform:translateY(-1px);text-decoration:none;color:#FFFFFF;}
+
+/* ── Severity (finding-box) ────────────────────────────────── */
+.fbox{background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:13px;}
+.frow{display:flex;align-items:flex-start;border-bottom:1px solid var(--border);font-size:12px;}
+.frow:last-child{border-bottom:none;}
+.flbl{font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:9px 13px;width:140px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg-card);}
+.fval{padding:9px 13px;color:var(--text);font-family:var(--ff-m);font-size:13px;flex:1;}
+.fval.severity-critical{color:var(--red);font-weight:700;}
+.fval.severity-high    {color:var(--orange);font-weight:700;}
+.fval.severity-medium  {color:var(--amber);font-weight:700;}
+.fval.severity-low     {color:var(--atk);font-weight:700;}
+
+/* ── Page-load stagger ─────────────────────────────────────── */
+.sa{scroll-margin-top:14px;}
+.sa:nth-child(1){animation:fadeUp .4s .05s both;}
+.sa:nth-child(2){animation:fadeUp .4s .1s  both;}
+.sa:nth-child(3){animation:fadeUp .4s .16s both;}
+.sa:nth-child(4){animation:fadeUp .4s .22s both;}
+.sa:nth-child(5){animation:fadeUp .4s .28s both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Onboarding Tour ───────────────────────────────────────── */
+#tour-overlay{position:fixed;inset:0;z-index:10001;pointer-events:none;}
+#tour-overlay.active{pointer-events:all;}
+#tour-spotlight{
+  position:fixed;border-radius:10px;
+  box-shadow:0 0 0 9999vmax rgba(10,18,36,0.74);
+  transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),
+             width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1),
+             opacity .25s ease, box-shadow .25s ease;
+  border:2px solid rgba(2,132,199,0.8);
+  outline:4px solid rgba(2,132,199,0.18);
+  pointer-events:none;
+}
+#tour-spotlight.hidden{opacity:0;box-shadow:none;border-color:transparent;outline-color:transparent;}
+#tour-box{
+  position:fixed;background:var(--bg-card);
+  border:1px solid rgba(2,132,199,0.38);border-radius:12px;
+  padding:20px 22px 15px;width:305px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.3),0 0 0 1px rgba(2,132,199,0.1);
+  z-index:10002;transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1);
+}
+#tour-box::before{
+  content:'';position:absolute;width:11px;height:11px;background:var(--bg-card);
+  border:1px solid rgba(2,132,199,0.38);transform:rotate(45deg);
+}
+#tour-box.arr-left::before{left:-6px;top:20px;border-right:none;border-top:none;}
+#tour-box.arr-right::before{right:-6px;top:20px;border-left:none;border-bottom:none;}
+#tour-box.arr-top::before{top:-6px;left:20px;border-bottom:none;border-right:none;}
+#tour-box.arr-bottom::before{bottom:-6px;left:20px;border-top:none;border-left:none;}
+#tour-box.arr-none::before{display:none;}
+#tour-step-meta{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+#tour-step-label{font-family:var(--ff-m);font-size:10px;letter-spacing:.2em;color:var(--falco);text-transform:uppercase;}
+#tour-dots{display:flex;gap:5px;margin-left:auto;}
+.tdot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:all .25s;}
+.tdot.on{background:var(--falco);box-shadow:0 0 7px var(--falco-glow);}
+#tour-title{font-family:var(--ff-brand);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.08em;margin-bottom:8px;line-height:1.35;}
+#tour-desc{font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:15px;}
+#tour-nav{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:11px;}
+.tbtn{font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.06em;padding:6px 13px;border-radius:5px;cursor:pointer;transition:all .18s;}
+.tbtn-skip{background:transparent;color:var(--dim);border:1px solid transparent;}
+.tbtn-skip:hover{color:var(--text);border-color:var(--border);}
+.tbtn-prev{background:transparent;color:var(--muted);border:1px solid var(--border);}
+.tbtn-prev:hover{background:var(--bg-card2);color:var(--text);}
+.tbtn-next{background:var(--falco);color:#fff;border:none;margin-left:6px;}
+.tbtn-next:hover{background:#0369a1;}
+</style>
+</head>
+<body>
+
+<!-- ── Onboarding Tour ─────────────────────────────────────── -->
+<div id="tour-overlay">
+  <div id="tour-spotlight" class="hidden"></div>
+  <div id="tour-box" class="arr-none" style="display:none">
+    <div id="tour-step-meta">
+      <span id="tour-step-label">STEP 1 OF 7</span>
+      <div id="tour-dots"></div>
+    </div>
+    <div id="tour-title"></div>
+    <div id="tour-desc"></div>
+    <div id="tour-nav">
+      <button class="tbtn tbtn-skip" onclick="tourEnd()">Skip tour</button>
+      <div style="display:flex">
+        <button class="tbtn tbtn-prev" id="tour-prev-btn" onclick="tourPrev()">← Back</button>
+        <button class="tbtn tbtn-next" id="tour-next-btn" onclick="tourNext()">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo-row">
+      <div class="sb-logo">🛡</div>
+      <div>
+        <div class="sb-name">CONTAINER<br>SENTINEL</div>
+        <div class="sb-sub">Ops Center</div>
+      </div>
+    </div>
+  </div>
+  <div class="sb-scroll">
+    <div class="sb-grp">Overview</div>
+    <a class="sb-item active" href="#sec-overview" onclick="setActive(this)">
+      <span class="si">◈</span> Dashboard
+      <span class="sb-dot" id="dot-env"></span>
+    </a>
+    <a class="sb-item" href="#sec-environment" onclick="setActive(this)">
+      <span class="si">⬡</span> Environment
+    </a>
+    <div class="sb-sep"></div>
+    <div class="sb-grp">Operations</div>
+    <a class="sb-item" href="#sec-attacks" onclick="setActive(this)">
+      <span class="si">⚡</span> Attack Modules
+    </a>
+    <a class="sb-item" href="#sec-output" onclick="setActive(this)">
+      <span class="si">▶</span> Live Output
+      <span class="sb-dot" id="dot-ws"></span>
+    </a>
+    <a class="sb-item" href="/scanner">
+      <span class="si">🔍</span> Image Scanner <span class="ext">↗</span>
+    </a>
+    <div class="sb-sep"></div>
+    <div class="sb-grp">Detection</div>
+    <a class="sb-item" href="#sec-falco" onclick="setActive(this)">
+      <span class="si" style="color:var(--falco)">⬢</span> Falco Alerts
+      <span class="sb-dot" id="dot-falco-ws"></span>
+    </a>
+    <a class="sb-item" href="#sec-intel" onclick="setActive(this)">
+      <span class="si">⬧</span> Threat Intel
+    </a>
+    <div class="sb-sep"></div>
+    <div class="sb-grp">Reports</div>
+    <a class="sb-item" href="/logs" target="_blank">
+      <span class="si">≡</span> All Logs <span class="ext">↗</span>
+    </a>
+  </div>
+  <div class="sb-footer">
+    <div class="sb-conn-lbl">Stream Status</div>
+    <div class="sb-cr"><span class="cr-dot off" id="sb-dot-ws"></span>Attack Stream</div>
+    <div class="sb-cr"><span class="cr-dot off" id="sb-dot-falco"></span>Falco Stream</div>
+    <div class="sb-cr"><span class="cr-dot off" id="sb-dot-agent"></span>Agent Stream</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <span class="tb-title">SECURITY OPS</span>
+    <span class="tb-sep">/</span>
+    <span class="tb-sub">container-sentinel</span>
+    <div class="tb-right">
+      <span class="ws-chip" id="ws-badge">Attacks</span>
+      <span class="ws-chip" id="falco-ws-badge">Falco</span>
+      <span class="ws-chip" id="agent-ws-badge">Agents</span>
+      <button id="tour-help-btn" onclick="tourStart()" title="Take a guided tour" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:700;transition:all .18s;display:flex;align-items:center;justify-content:center;flex-shrink:0;" onmouseenter="this.style.borderColor='var(--falco)';this.style.color='var(--falco)'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">?</button>
+      <span class="env-chip">⚠ Research Env</span>
+      <span class="tb-clock" id="ts"></span>
+    </div>
+  </header>
+
+  <main class="content" id="page-content">
+
+    <!-- OVERVIEW -->
+    <div class="sa" id="sec-overview">
+      <div class="sh">◈ Overview</div>
+      <div class="ov-grid">
+        <div class="ov-card c-green">
+          <div class="ov-lbl">Containers Online</div>
+          <div class="ov-val" id="ov-containers">—</div>
+          <div class="ov-sub">Active in environment</div>
+        </div>
+        <div class="ov-card c-red">
+          <div class="ov-lbl">Attack Modules</div>
+          <div class="ov-val">7</div>
+          <div class="ov-sub">Available scenarios</div>
+        </div>
+        <div class="ov-card c-falco">
+          <div class="ov-lbl">Falco Alerts</div>
+          <div class="ov-val" id="ov-falco-count">0</div>
+          <div class="ov-sub">Runtime detections</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENVIRONMENT -->
+    <div class="sa" id="sec-environment">
+      <div class="sh">⬡ Environment</div>
+      <div class="card a-green">
+        <div class="ch">
+          <span class="ch-icon" style="color:var(--atk)">⬡</span>
+          <span class="ch-title">Container Status</span>
+          <div class="ch-right"><span class="chip-r">Auto-Refresh 5s</span></div>
+        </div>
+        <table class="st">
+          <tbody id="status-tbody">
+            <tr><td colspan="3" style="padding:13px 17px;color:var(--dim)">Connecting...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ATTACK MODULES -->
+    <div class="sa" id="sec-attacks">
+      <div class="sh">⚡ Attack Modules</div>
+      <div class="card a-red">
+        <div class="ch">
+          <span class="ch-icon" style="color:var(--red)">⚡</span>
+          <span class="ch-title">Simulation Arsenal</span>
+          <div class="ch-right">
+            <span class="chip-r" style="color:var(--muted)">7 modules</span>
+          </div>
+        </div>
+        <div class="ar" id="row-docker-socket">
+          <div class="ar-num">I</div>
+          <div class="ar-info">
+            <div class="ar-title">Docker Socket Abuse</div>
+            <div class="ar-desc">Abuse /var/run/docker.sock on flask-target → spawn root container, mount host FS, read /etc/shadow.</div>
+            <div class="ar-status" id="s-docker-socket">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-docker-socket" onclick="fireAttack('docker-socket','docker_socket')">Execute</button>
+        </div>
+        <div class="ar" id="row-nsenter-escape">
+          <div class="ar-num">II</div>
+          <div class="ar-info">
+            <div class="ar-title">Privileged Nsenter Escape</div>
+            <div class="ar-desc">nsenter -t 1 -m -u -n -i from privileged flask-target → host PID 1 namespace → root shell.</div>
+            <div class="ar-status" id="s-nsenter-escape">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-nsenter-escape" onclick="fireAttack('nsenter-escape','nsenter_escape')">Execute</button>
+        </div>
+        <div class="ar" id="row-lateral-redis">
+          <div class="ar-num">III</div>
+          <div class="ar-info">
+            <div class="ar-title">Redis Lateral Movement</div>
+            <div class="ar-desc">Network pivot: attacker → nmap 172.20.0.0/24 → redis-target:6379 → FLUSHALL + CONFIG SET cron backdoor.</div>
+            <div class="ar-status" id="s-lateral-redis">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-lateral-redis" onclick="fireAttack('lateral-redis','lateral_redis')">Execute</button>
+        </div>
+        <div class="ar" id="row-runc-cve">
+          <div class="ar-num">IV</div>
+          <div class="ar-info">
+            <div class="ar-title">CVE-2025-31133 — Runc Symlink Swap</div>
+            <div class="ar-desc">maskedPaths bypass via /dev/null → symlink swap during container init → reads /proc/kcore &amp; /proc/1/environ.</div>
+            <div class="ar-status" id="s-runc-cve">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-runc-cve" onclick="fireAttack('runc-cve-2025','runc_cve')">Execute</button>
+        </div>
+        <div class="ar" id="row-authz-bypass">
+          <div class="ar-num">V</div>
+          <div class="ar-info">
+            <div class="ar-title">
+              CVE-2026-34040 — Docker AuthZ Bypass
+              <span style="font-size:9px;color:var(--red);border:1px solid rgba(255,45,85,.28);padding:1px 6px;border-radius:3px;margin-left:6px;letter-spacing:.06em;font-family:var(--ff-m);">APR 2026</span>
+            </div>
+            <div class="ar-desc">Oversized POST (&gt;1 MB) to Docker socket silently drops body before AuthZ inspection → executes full payload → privileged container reads /etc/shadow.</div>
+            <div class="ar-status" id="s-authz-bypass">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-authz-bypass" onclick="fireAttack('authz-bypass-2026','authz_bypass')">Execute</button>
+        </div>
+        <div class="ar" id="row-dos-attack">
+          <div class="ar-num">VI</div>
+          <div class="ar-info">
+            <div class="ar-title">DoS — Resource Exhaustion &amp; HTTP Flood</div>
+            <div class="ar-desc">4-phase: CPU spike (all cores), 256 MB memory pressure, 500-process fork-bomb, 500-req HTTP flood at nginx-target — all via containers with no cgroup limits.</div>
+            <div class="ar-status" id="s-dos-attack">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-dos-attack" onclick="fireAttack('dos-attack','dos_attack')">Execute</button>
+        </div>
+        <div class="ar" id="row-supply-chain-attack">
+          <div class="ar-num">VII</div>
+          <div class="ar-info">
+            <div class="ar-title">Supply Chain — Image Tampering &amp; Dependency Poisoning</div>
+            <div class="ar-desc">5-phase: image provenance recon (no Content Trust / digest pinning), typosquatted pip injection, backdoor write to writable FS, credential exfiltration from plaintext env vars.</div>
+            <div class="ar-status" id="s-supply-chain-attack">READY</div>
+          </div>
+          <button class="btn-exec" id="btn-supply-chain-attack" onclick="fireAttack('supply-chain-attack','supply_chain_attack')">Execute</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETECTION — dual panel -->
+    <div class="sa" id="sec-output">
+      <div class="sh">▶ Live Detection</div>
+    </div>
+    <div class="dp">
+      <!-- Attack Log -->
+      <div class="card a-atk panel-atk">
+        <div class="ch">
+          <span class="ch-icon" style="color:var(--atk)">▶</span>
+          <span class="ch-title">Attack Log</span>
+          <div class="ch-right">
+            <a href="/logs" style="font-family:var(--ff-m);font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:.04em;" target="_blank">All Logs ↗</a>
+          </div>
+        </div>
+        <div id="output-box"></div>
+      </div>
+      <!-- Falco Alerts -->
+      <div class="card a-falco panel-falco" id="sec-falco">
+        <div class="ch">
+          <span class="ch-icon" style="color:var(--falco)">⬢</span>
+          <span class="ch-title">Falco Runtime Alerts</span>
+          <div class="ch-right">
+            <button class="btn-sm" onclick="clearFalcoBox()">Clear</button>
+            <button class="btn-sm primary" id="btn-analyze" onclick="triggerFalcoAnalysis()">⚙ Analyze AI</button>
+          </div>
+        </div>
+        <div id="falco-box">
+          <div id="falco-empty">No alerts yet. Run an attack to see Falco detections.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FALCO INTEL -->
+    <div class="sa" id="sec-intel"></div>
+    <div class="card a-falco" id="falco-intel-box" style="display:none">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--falco)">⬧</span>
+        <span class="ch-title">Falco Threat Intelligence</span>
+        <div class="ch-right">
+          <span style="font-family:var(--ff-m);font-size:9px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;">AI Agent Analysis</span>
+          <button id="btn-export-pdf" onclick="exportFalcoPDF()" class="btn-report" style="padding:4px 12px;font-size:10px;background:transparent;border:1px solid var(--border);cursor:pointer;display:none;" title="Export structured PDF report">⬇ Export PDF</button>
+        </div>
+      </div>
+      <div class="card-body" id="falco-intel-body">
+        <div id="falco-intel-status">⚙ AI Agent Running...</div>
+      </div>
+    </div>
+
+    <!-- HIDDEN: agent/finding elements preserved for JS compatibility -->
+    <div style="display:none" aria-hidden="true">
+      <div id="card-scanner"><div id="state-scanner" class="ag-state">IDLE</div><div id="summary-scanner"></div></div>
+      <div id="card-monitor"> <div id="state-monitor"  class="ag-state">IDLE</div><div id="summary-monitor"></div></div>
+      <div id="card-network"> <div id="state-network"  class="ag-state">IDLE</div><div id="summary-network"></div></div>
+      <div id="card-reporter"><div id="state-reporter" class="ag-state">IDLE</div><div id="summary-reporter"></div></div>
+      <div id="finding-box">
+        <span id="f-severity" class="fval"></span>
+        <span id="f-ttp"  class="fval"></span>
+        <span id="f-tactic" class="fval"></span>
+        <span id="f-cvss" class="fval"></span>
+        <span id="f-pivot" class="fval"></span>
+        <span id="f-breach" class="fval"></span>
+        <span id="f-root" class="fval"></span>
+        <span id="f-fix"  class="fval"></span>
+      </div>
+    </div>
+
+  </main>
+</div>
+</div>
+
+<script>
+/* Clock */
+function tick(){document.getElementById('ts').textContent=new Date().toISOString().replace('T',' ').slice(0,19)+' UTC';}
+tick();setInterval(tick,1000);
+
+/* Nav */
+function setActive(el){document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));el.classList.add('active');}
+const sections=['sec-overview','sec-environment','sec-attacks','sec-output','sec-intel'];
+const navMap={
+  'sec-overview':   '[href="#sec-overview"]',
+  'sec-environment':'[href="#sec-environment"]',
+  'sec-attacks':    '[href="#sec-attacks"]',
+  'sec-output':     '[href="#sec-output"]',
+  'sec-intel':      '[href="#sec-intel"]',
+};
+const contentEl=document.getElementById('page-content');
+contentEl.addEventListener('scroll',()=>{
+  let cur='sec-overview';
+  for(const id of sections){const el=document.getElementById(id);if(el&&el.getBoundingClientRect().top-100<=0)cur=id;}
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  const t=document.querySelector(`.sb-item${navMap[cur]}`);if(t)t.classList.add('active');
+},{passive:true});
+document.querySelectorAll('.sb-item[href^="#"]').forEach(link=>{
+  link.addEventListener('click',e=>{e.preventDefault();const el=document.getElementById(link.getAttribute('href').slice(1));if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});
+});
+
+/* WS chip helpers */
+function setWsChip(id,on){const el=document.getElementById(id);if(el)el.className='ws-chip'+(on?' live':'');}
+function setSbDot(id,on){const el=document.getElementById(id);if(el)el.className='cr-dot '+(on?'on':'off');}
+function setSbItemDot(id,on){const el=document.getElementById(id);if(el)el.className='sb-dot'+(on?' on':'');}
+
+/* Container status */
+async function refreshStatus(){
+  try{
+    const res=await fetch('/api/containers/status');const data=await res.json();
+    const tbody=document.getElementById('status-tbody');tbody.innerHTML='';
+    let running=0;
+    data.forEach(c=>{
+      if(c.status==='running')running++;
+      const tr=document.createElement('tr');
+      const flags=(c.flags||[]).map(f=>`<span class="flag">${f}</span>`).join('');
+      tr.innerHTML=`<td>${c.name}</td><td>${c.ip||''}</td><td><span class="${c.status==='running'?'tag-running':'tag-stopped'}">${c.status==='running'?'Running':'Stopped'}${flags}</span></td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('ov-containers').textContent=running+'/'+data.length;
+    setSbItemDot('dot-env',running>0);
+  }catch(e){document.getElementById('status-tbody').innerHTML='<tr><td colspan="3" style="padding:13px 17px;color:var(--dim)">API unreachable</td></tr>';}
+}
+refreshStatus();setInterval(refreshStatus,5000);
+
+/* Attack WebSocket */
+let ws=null;
+const OUTPUT=document.getElementById('output-box');
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws/attacks`);
+  ws.onopen=()=>{setWsChip('ws-badge',true);setSbDot('sb-dot-ws',true);setSbItemDot('dot-ws',true);};
+  ws.onmessage=(e)=>appendLine(e.data);
+  ws.onclose=()=>{setWsChip('ws-badge',false);setSbDot('sb-dot-ws',false);setSbItemDot('dot-ws',false);setTimeout(connectWS,3000);};
+  ws.onerror=()=>ws.close();
+}
+connectWS();
+
+function appendLine(text){
+  const div=document.createElement('div');
+  let cls='line-ok';
+  if(text.startsWith('[+]'))cls='line-plus';
+  else if(text.startsWith('[!]'))cls='line-bang';
+  else if(text.startsWith('[>]'))cls='line-cmd';
+  div.className=cls+' ne';
+  div.textContent=text;
+  OUTPUT.appendChild(div);
+  OUTPUT.scrollTop=OUTPUT.scrollHeight;
+  setTimeout(()=>div.classList.remove('ne'),300);
+}
+
+/* Attack fire/poll */
+let activeAttackKey=null;
+async function fireAttack(endpoint,key){
+  if(activeAttackKey){appendLine('[!] An attack is already running. Wait for it to finish.');return;}
+  const btnKey=key.replace(/_/g,'-');
+  const btn=document.getElementById('btn-'+btnKey);
+  const statusEl=document.getElementById('s-'+btnKey);
+  btn.disabled=true;btn.classList.add('running');btn.textContent='Running…';statusEl.textContent='RUNNING...';activeAttackKey=key;
+  try{
+    const res=await fetch(`/api/attacks/${endpoint}`,{method:'POST'});const data=await res.json();
+    if(res.ok){statusEl.textContent=`LAUNCHED  id=${data.id}`;pollStatus(data.id,btn,statusEl,key);}
+    else{throw new Error(data.detail||'Launch failed');}
+  }catch(e){appendLine('[!] ERROR: '+e.message);resetBtn(btn,statusEl,key);}
+}
+function pollStatus(runId,btn,statusEl,key){
+  const iv=setInterval(async()=>{
+    try{
+      const res=await fetch(`/api/attacks/history/${runId}`);const data=await res.json();
+      if(data.status!=='running'){clearInterval(iv);statusEl.textContent=`${data.status.toUpperCase()}  exit=${data.exit_code}  ${data.duration_seconds?.toFixed(1)}s`;resetBtn(btn,statusEl,key);}
+    }catch(e){clearInterval(iv);resetBtn(btn,statusEl,key);}
+  },1000);
+}
+function resetBtn(btn,statusEl,key){btn.disabled=false;btn.classList.remove('running');btn.textContent='Execute';activeAttackKey=null;}
+
+/* Agent WebSocket */
+let agentWs=null,activeAgents=0;
+function connectAgentWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  agentWs=new WebSocket(`${proto}://${location.host}/ws/agents`);
+  agentWs.onopen=()=>{setWsChip('agent-ws-badge',true);setSbDot('sb-dot-agent',true);setSbItemDot('dot-agent-ws',true);};
+  agentWs.onmessage=(e)=>{
+    try{const msg=JSON.parse(e.data);if(msg.type==='agent_status')handleAgentStatus(msg);else if(msg.type==='finding')handleFinding(msg.data);else if(msg.type==='error')appendLine('[!] AGENT ERROR: '+msg.message);}catch(err){}
+  };
+  agentWs.onclose=()=>{setWsChip('agent-ws-badge',false);setSbDot('sb-dot-agent',false);setSbItemDot('dot-agent-ws',false);setTimeout(connectAgentWS,3000);};
+  agentWs.onerror=()=>agentWs.close();
+}
+connectAgentWS();
+
+function handleAgentStatus(msg){
+  const stateEl=document.getElementById('state-'+msg.agent);
+  const sumEl=document.getElementById('summary-'+msg.agent);
+  if(!stateEl)return;
+  stateEl.textContent=msg.state;stateEl.className='ag-state '+msg.state.toLowerCase();
+  if(msg.summary&&sumEl)sumEl.textContent=msg.summary.slice(0,120);
+  activeAgents=document.querySelectorAll('.ag-state.running').length;
+  document.getElementById('ov-agents-active').textContent=activeAgents;
+  document.getElementById('ov-agents-sub').textContent=activeAgents>0?'Running':'Idle';
+}
+function handleFinding(data){
+  const sev=data.overall_severity||'UNKNOWN';
+  const sevEl=document.getElementById('f-severity');
+  if(sevEl){sevEl.textContent=sev+(data.cvss_score?` (CVSS ${data.cvss_score})`:'');sevEl.className='fval severity-'+sev.toLowerCase();}
+  setText('f-ttp',data.mitre_ttp||'—');setText('f-tactic',data.mitre_tactic||'—');setText('f-cvss',data.cvss_score!=null?String(data.cvss_score):'—');
+  const net=(data.findings||{}).network||{};setText('f-pivot',net.pivot_path||'—');setText('f-breach',net.host_breach?'YES':'NO');
+  const rep=(data.findings||{}).reporter||{};setText('f-root',rep.root_cause||'—');setText('f-fix',rep.remediation||'—');
+}
+function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
+
+/* Falco WebSocket */
+let falcoWs=null,falcoCount=0;
+const FALCO_BOX=document.getElementById('falco-box');
+
+function clearFalcoBox(){
+  FALCO_BOX.innerHTML='<div id="falco-empty">No alerts yet. Run an attack to see Falco detections.</div>';
+  falcoCount=0;
+  document.getElementById('ov-falco-count').textContent='0';
+  fetch('/api/falco/events',{method:'DELETE'}).catch(()=>{});
+}
+
+function connectFalcoWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  falcoWs=new WebSocket(`${proto}://${location.host}/ws/falco`);
+  falcoWs.onopen=()=>{setWsChip('falco-ws-badge',true);setSbDot('sb-dot-falco',true);setSbItemDot('dot-falco-ws',true);};
+  falcoWs.onmessage=(e)=>{
+    try{
+      const msg=JSON.parse(e.data);
+      if(msg.type==='falco_analysis')handleFalcoAnalysis(msg);
+      else if(msg.type==='falco_analyze_status')handleFalcoAnalyzeStatus(msg);
+      else if(msg.type==='falco_report')handleFalcoReport(msg.report);
+      else if(msg.type==='falco_cleared'){
+        FALCO_BOX.innerHTML='<div id="falco-empty">No alerts yet. Run an attack to see Falco detections.</div>';
+        falcoCount=0;document.getElementById('ov-falco-count').textContent='0';
+      }
+      else appendFalcoAlert(msg);
+    }catch(err){}
+  };
+  falcoWs.onclose=()=>{setWsChip('falco-ws-badge',false);setSbDot('sb-dot-falco',false);setSbItemDot('dot-falco-ws',false);setTimeout(connectFalcoWS,3000);};
+  falcoWs.onerror=()=>falcoWs.close();
+}
+connectFalcoWS();
+
+function appendFalcoAlert(evt){
+  const empty=document.getElementById('falco-empty');if(empty)empty.remove();
+  const eventId=evt.id||('x'+(++falcoCount));
+  const pri=(evt.priority||'INFO').toUpperCase();
+  const cont=evt.container||'host';const rule=evt.rule||evt.output||'';
+  const pc=pri==='CRITICAL'?'f-critical':pri==='WARNING'?'f-warning':'f-notice';
+  const isCrit=pri==='CRITICAL';
+  const row=document.createElement('div');
+  row.className='fr ne'+(isCrit?' fc':'');
+  row.id=`falco-row-${eventId}`;
+  row.innerHTML=`<span class="f-pri ${pc}">[${pri}]</span><span class="f-cont">${cont}</span><span class="f-rule">${rule}</span>`;
+  const ai=document.createElement('div');ai.className='f-ai pending';ai.id=`falco-ai-${eventId}`;ai.textContent='AI: analyzing...';
+  FALCO_BOX.appendChild(row);FALCO_BOX.appendChild(ai);falcoCount++;
+  document.getElementById('ov-falco-count').textContent=falcoCount;
+  const rows=FALCO_BOX.querySelectorAll('.fr');
+  if(rows.length>50){const o=rows[0];const oa=o.nextElementSibling;o.remove();if(oa&&oa.classList.contains('f-ai'))oa.remove();}
+  FALCO_BOX.scrollTop=FALCO_BOX.scrollHeight;
+  setTimeout(()=>row.classList.remove('ne','fc'),1400);
+}
+
+function handleFalcoAnalysis(msg){
+  const el=document.getElementById(`falco-ai-${msg.event_id}`);if(!el)return;
+  const a=msg.analysis||{};el.className='f-ai done';
+  el.innerHTML=`<span class="f-ai-lbl">AI›</span><span class="f-ai-sum">${esc(a.threat_summary||'')}</span>`+
+    (a.risk?`<span class="f-ai-sep">·</span><span class="f-ai-risk">${esc(a.risk)}</span>`:'')+
+    (a.action?`<span class="f-ai-sep">→</span><span class="f-ai-act">${esc(a.action)}</span>`:'');
+  FALCO_BOX.scrollTop=FALCO_BOX.scrollHeight;
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function triggerFalcoAnalysis(){
+  const btn=document.getElementById('btn-analyze');btn.disabled=true;btn.innerHTML='⚙ Running…';
+  try{
+    const res=await fetch('/api/falco/analyze',{method:'POST'});const data=await res.json();
+    if(!res.ok){appendLine('[!] FALCO ANALYZE: '+(data.error||'Failed'));resetAnalyzeBtn();}
+  }catch(e){appendLine('[!] FALCO ANALYZE ERROR: '+e.message);resetAnalyzeBtn();}
+}
+function resetAnalyzeBtn(){const btn=document.getElementById('btn-analyze');if(btn){btn.disabled=false;btn.innerHTML='⚙ Analyze AI';}}
+
+function handleFalcoAnalyzeStatus(msg){
+  const box=document.getElementById('falco-intel-box');const statusEl=document.getElementById('falco-intel-status');box.style.display='';
+  if(msg.state==='RUNNING'){statusEl.className='';statusEl.innerHTML=`⚙ AI Agent Running… ${esc(msg.message||'')}`;}
+  else if(msg.state==='DONE'){statusEl.className='done';statusEl.innerHTML='✓ Analysis complete.';resetAnalyzeBtn();}
+  else if(msg.state==='ERROR'){statusEl.className='error';statusEl.innerHTML=`✗ Error: ${esc(msg.message||'Agent failed')}`;resetAnalyzeBtn();}
+}
+var _lastFalcoReport=null;
+function handleFalcoReport(report){
+  _lastFalcoReport=report;
+  const pdfBtn=document.getElementById('btn-export-pdf');if(pdfBtn)pdfBtn.style.display='';
+  const body=document.getElementById('falco-intel-body');const statusEl=document.getElementById('falco-intel-status');
+  const tc='intel-threat-'+(report.overall_threat_level||'low').toLowerCase();
+  const containers=(report.affected_containers||[]).join(', ')||'—';
+  let html=`<div class="isg">
+    <div class="isc"><span class="isc-lbl">Threat Level</span><span class="${tc}">${esc(report.overall_threat_level||'—')}</span></div>
+    <div class="isc"><span class="isc-lbl">Total Events</span><span class="isc-val">${report.total_events||0}</span></div>
+    <div class="isc"><span class="isc-lbl">Containers</span><span class="isc-val" style="font-size:14px">${esc(containers)}</span></div>
+    <div class="isc"><span class="isc-lbl">Rules Fired</span><span class="isc-val">${(report.unique_rules_fired||[]).length}</span></div>
+  </div>`;
+  if((report.attack_sequence||[]).length){
+    html+=`<div class="i-sect"><div class="i-sect-title">⟳ Attack Sequence</div><table class="i-tbl"><thead><tr><th>#</th><th>Time</th><th>Container</th><th>Rule</th><th>Priority</th></tr></thead><tbody>`;
+    report.attack_sequence.forEach(ev=>{const pc=(ev.priority||'').toUpperCase()==='CRITICAL'?'f-critical':'f-warning';html+=`<tr><td>${ev.seq}</td><td>${esc((ev.time||'').replace('T',' ').slice(0,19))}</td><td>${esc(ev.container||'')}</td><td>${esc(ev.rule||'')}</td><td class="${pc}">${esc(ev.priority||'')}</td></tr>`;});
+    html+=`</tbody></table></div>`;
+  }
+  if((report.mitre_mappings||[]).length){
+    html+=`<div class="i-sect"><div class="i-sect-title">⬡ MITRE ATT&amp;CK Mappings</div><table class="i-tbl"><thead><tr><th>TTP ID</th><th>Tactic</th><th>Technique</th></tr></thead><tbody>`;
+    report.mitre_mappings.forEach(m=>{html+=`<tr><td>${esc(m.ttp_id||'')}</td><td>${esc(m.tactic||'')}</td><td>${esc(m.technique||'')}</td></tr>`;});
+    html+=`</tbody></table></div>`;
+  }
+  if(report.threat_narrative){
+    html+=`<div class="i-sect"><div class="i-sect-title">📋 Threat Narrative</div><div class="i-narr">${esc(report.threat_narrative)}</div></div>`;
+  }
+  if((report.remediation_steps||[]).length){
+    html+=`<div class="i-sect"><div class="i-sect-title">⚒ Remediation Steps</div><ul class="i-rem">`;
+    report.remediation_steps.forEach(step=>{html+=`<li>${esc(step)}</li>`;});
+    html+=`</ul></div>`;
+  }
+  if((report.rule_analysis||[]).length){
+    html+=`<div class="i-sect"><div class="i-sect-title">⬡ Rule Root Cause Analysis</div><ul class="rca-rule-list">`;
+    report.rule_analysis.forEach((a,idx)=>{
+      const urg=(a.urgency||'routine').toLowerCase().replace(/\s+/g,'-');
+      const urgLabel={'immediate':'IMMEDIATE','within-30-days':'30 DAYS','routine':'ROUTINE'}[urg]||(urg.toUpperCase());
+      html+=`<li class="rca-rule-item">`+
+        `<div class="rca-rule-hdr" id="frca-h-${idx}" onclick="toggleFRca(${idx})">`+
+          `<span class="rca-rule-name">${esc(a.rule||'')}</span>`+
+          `<span class="rca-ttp">${esc(a.ttp_id||'')}</span>`+
+          `<span class="rca-urg rca-urg-${urg}">${urgLabel}</span>`+
+          `<span class="rca-chev">▼</span>`+
+        `</div>`+
+        `<div class="rca-rule-body" id="frca-b-${idx}">`+
+          `<div class="rca-field"><div class="rca-field-lbl">Root Cause</div><div class="rca-field-val">${esc(a.root_cause||'—')}</div></div>`+
+          `<div class="rca-field"><div class="rca-field-lbl">Attack Scenario</div><div class="rca-field-val">${esc(a.attack_scenario||'—')}</div></div>`+
+          (a.exact_fix?`<div class="rca-field"><div class="rca-field-lbl">Exact Fix</div>`+
+            `<div class="rca-cmd-box"><span class="rca-cmd">${esc(a.exact_fix)}</span>`+
+            `<button class="rca-copy" id="frca-cp-${idx}" onclick="copyFRca(event,${idx},'${escFRca(a.exact_fix)}')">Copy</button></div></div>`:'')+
+          (a.container_fix?`<div class="rca-field"><div class="rca-field-lbl">Container / Compose Fix</div><div class="rca-compose-box">${esc(a.container_fix)}</div></div>`:'')+
+        `</div>`+
+      `</li>`;
+    });
+    html+=`</ul></div>`;
+  }
+  if(report.summary){html+=`<div class="i-sum">${esc(report.summary)}</div>`;}
+  body.innerHTML='';body.appendChild(statusEl);const d=document.createElement('div');d.innerHTML=html;body.appendChild(d);
+}
+function toggleFRca(idx){
+  const h=document.getElementById('frca-h-'+idx);const b=document.getElementById('frca-b-'+idx);
+  const open=b.classList.contains('open');b.classList.toggle('open',!open);h.classList.toggle('open',!open);
+}
+function copyFRca(e,idx,txt){
+  e.stopPropagation();
+  navigator.clipboard.writeText(txt).then(()=>{
+    const btn=document.getElementById('frca-cp-'+idx);
+    btn.textContent='Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},1800);
+  });
+}
+function escFRca(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+
+/* ── PDF Export (print-window — no jsPDF, zero freeze) ─────── */
+function exportFalcoPDF(){
+  var r=_lastFalcoReport;
+  if(!r){alert('No report available — run AI analysis first.');return;}
+
+  var level=(r.overall_threat_level||'LOW').toUpperCase();
+  var lvlClass={CRITICAL:'lvl-critical',HIGH:'lvl-high',MEDIUM:'lvl-medium',LOW:'lvl-low'}[level]||'lvl-low';
+  var ts=new Date().toLocaleString();
+
+  function E(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+  /* ── Attack timeline rows ── */
+  var timelineRows=(r.attack_sequence||[]).map(function(e){
+    var p=(e.priority||'').toUpperCase();
+    var pc=p==='CRITICAL'?'pri-critical':(p==='WARNING'||p==='HIGH'?'pri-high':'');
+    return'<tr><td class="mono">'+E(e.seq)+'</td><td class="mono">'+E((e.time||'').replace('T',' ').slice(0,19))+'</td><td>'+E(e.container||'')+'</td><td>'+E(e.rule||'')+'</td><td class="'+pc+' mono">'+E(p)+'</td></tr>';
+  }).join('');
+
+  /* ── MITRE rows ── */
+  var mitreRows=(r.mitre_mappings||[]).map(function(m){
+    return'<tr><td class="mono ttp">'+E(m.ttp_id||'')+'</td><td>'+E(m.tactic||'')+'</td><td>'+E(m.technique||'')+'</td></tr>';
+  }).join('');
+
+  /* ── Threat narrative ── */
+  var narrativeHtml='';
+  if(r.threat_narrative){
+    narrativeHtml='<section class="sect"><div class="sect-hdr"><span class="sect-num">04</span><span class="sect-title">Threat Narrative</span></div><div class="narrative">'+(r.threat_narrative||'').split(/\n+/).filter(function(p){return p.trim();}).map(function(p){return'<p>'+E(p.trim())+'</p>';}).join('')+'</div></section>';
+  }
+
+  /* ── Rule RCA cards ── */
+  var rcaHtml='';
+  if((r.rule_analysis||[]).length){
+    var cards=(r.rule_analysis||[]).map(function(a,i){
+      var urg=(a.urgency||'routine').toLowerCase().replace(/\s+/g,'-');
+      var urgLabel={immediate:'IMMEDIATE','within-30-days':'30-DAY',routine:'ROUTINE'}[urg]||urg.toUpperCase();
+      var fixHtml=a.exact_fix?'<div class="field-lbl">EXACT FIX COMMAND</div><div class="code-block">'+E(a.exact_fix)+'</div>':'';
+      var composeHtml=a.container_fix?'<div class="field-lbl">CONTAINER / COMPOSE FIX</div><div class="field-val compose-val">'+E(a.container_fix)+'</div>':'';
+      return'<div class="rule-card urg-'+urg+'">'
+        +'<div class="rule-card-hdr">'
+          +'<span class="rule-num">RULE '+(i+1)+'</span>'
+          +'<span class="rule-name">'+E(a.rule||'')+'</span>'
+          +'<span class="ttp-badge">'+E(a.ttp_id||'')+'</span>'
+          +'<span class="urg-badge urg-'+urg+'">'+urgLabel+'</span>'
+        +'</div>'
+        +'<div class="rule-card-body">'
+          +(a.root_cause?'<div class="field-lbl">ROOT CAUSE</div><div class="field-val">'+E(a.root_cause)+'</div>':'')
+          +(a.attack_scenario?'<div class="field-lbl">ATTACK SCENARIO</div><div class="field-val">'+E(a.attack_scenario)+'</div>':'')
+          +fixHtml+composeHtml
+        +'</div>'
+      +'</div>';
+    }).join('');
+    rcaHtml='<section class="sect"><div class="sect-hdr"><span class="sect-num">05</span><span class="sect-title">Rule Root Cause Analysis</span></div>'+cards+'</section>';
+  }
+
+  /* ── Remediation steps ── */
+  var remHtml='';
+  if((r.remediation_steps||[]).length){
+    var steps=(r.remediation_steps||[]).map(function(s,i){
+      return'<li><span class="step-num">'+(i+1)+'</span><span class="step-text">'+E(s)+'</span></li>';
+    }).join('');
+    remHtml='<section class="sect"><div class="sect-hdr"><span class="sect-num">06</span><span class="sect-title">Remediation Priority</span></div><ol class="rem-list">'+steps+'</ol></section>';
+  }
+
+  /* ── Full HTML document ── */
+  var html='<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
+    +'<title>Falco Threat Intelligence Report — '+ts+'</title>'
+    +'<link rel="preconnect" href="https://fonts.googleapis.com">'
+    +'<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0;}'
+    +'@page{size:A4;margin:14mm 17mm 17mm 17mm;}'
+    +'body{font-family:"IBM Plex Sans",sans-serif;font-size:9.5pt;color:#1e293b;background:#fff;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    +'.mono{font-family:"IBM Plex Mono",monospace;}'
+
+    /* page header repeated via @top */
+    +'.page-hdr{display:flex;justify-content:space-between;align-items:center;padding-bottom:5mm;border-bottom:2.5px solid #0f172a;margin-bottom:7mm;}'
+    +'.brand{font-size:8pt;font-weight:700;letter-spacing:.12em;color:#0f172a;}'
+    +'.brand span{color:#0ea5e9;}'
+    +'.conf{font-size:7pt;color:#94a3b8;letter-spacing:.08em;}'
+
+    /* report title block */
+    +'.report-title{margin-bottom:7mm;}'
+    +'.report-title h1{font-size:20pt;font-weight:700;color:#0f172a;line-height:1.1;letter-spacing:-.02em;}'
+    +'.report-title h2{font-size:9.5pt;font-weight:300;color:#64748b;margin-top:1.5mm;letter-spacing:.04em;}'
+    +'.title-rule{width:48mm;height:2.5px;background:#0ea5e9;margin:3mm 0;}'
+
+    /* threat badge */
+    +'.lvl-critical{background:#dc2626;color:#fff;}'
+    +'.lvl-high{background:#d97706;color:#fff;}'
+    +'.lvl-medium{background:#2563eb;color:#fff;}'
+    +'.lvl-low{background:#059669;color:#fff;}'
+    +'.threat-badge{display:inline-block;padding:3mm 7mm;border-radius:4px;font-size:12pt;font-weight:700;letter-spacing:.08em;margin-bottom:5mm;}'
+
+    /* metadata */
+    +'.meta-grid{border:1px solid #e2e8f0;border-radius:5px;overflow:hidden;margin-bottom:8mm;}'
+    +'.meta-row{display:flex;border-bottom:1px solid #e2e8f0;}'
+    +'.meta-row:last-child{border-bottom:none;}'
+    +'.meta-row:nth-child(even){background:#f8fafc;}'
+    +'.meta-lbl{font-size:7.5pt;font-weight:600;letter-spacing:.1em;color:#64748b;padding:3mm 4mm;width:44mm;flex-shrink:0;text-transform:uppercase;border-right:1px solid #e2e8f0;}'
+    +'.meta-val{font-size:9pt;color:#0f172a;padding:3mm 4mm;}'
+
+    /* summary callout */
+    +'.summary-box{background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid #0ea5e9;border-radius:5px;padding:4mm 5mm;margin-bottom:8mm;font-style:italic;font-size:10pt;color:#0f172a;line-height:1.6;}'
+
+    /* sections */
+    +'.sect{margin-bottom:8mm;page-break-inside:avoid;}'
+    +'.sect-hdr{display:flex;align-items:center;background:#0f172a;border-left:4px solid #0ea5e9;padding:3mm 4mm;margin-bottom:4mm;border-radius:3px;}'
+    +'.sect-num{font-family:"IBM Plex Mono",monospace;font-size:8pt;color:#0ea5e9;font-weight:600;margin-right:8px;flex-shrink:0;}'
+    +'.sect-title{font-size:9pt;font-weight:700;letter-spacing:.1em;color:#fff;text-transform:uppercase;}'
+
+    /* tables */
+    +'table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:2mm;}'
+    +'th{background:#0f172a;color:#fff;padding:3.5px 8px;text-align:left;font-size:7.5pt;font-weight:600;letter-spacing:.08em;}'
+    +'td{padding:4px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top;}'
+    +'tr:nth-child(even) td{background:#f8fafc;}'
+    +'.ttp{color:#0ea5e9;font-weight:600;}'
+    +'.pri-critical{color:#dc2626;font-weight:700;}'
+    +'.pri-high{color:#d97706;font-weight:700;}'
+
+    /* narrative */
+    +'.narrative p{margin-bottom:3.5mm;font-size:9.5pt;text-align:justify;}'
+    +'.narrative p:last-child{margin-bottom:0;}'
+
+    /* rule cards */
+    +'.rule-card{border:1px solid #e2e8f0;border-radius:6px;margin-bottom:4mm;page-break-inside:avoid;overflow:hidden;}'
+    +'.urg-immediate .rule-card-hdr{border-left:4px solid #dc2626;}'
+    +'.urg-within-30-days .rule-card-hdr{border-left:4px solid #d97706;}'
+    +'.urg-routine .rule-card-hdr{border-left:4px solid #059669;}'
+    +'.rule-card-hdr{display:flex;align-items:center;gap:6px;background:#f8fafc;padding:3mm 4mm;flex-wrap:wrap;}'
+    +'.rule-num{font-family:"IBM Plex Mono",monospace;font-size:7pt;font-weight:600;color:#64748b;flex-shrink:0;}'
+    +'.rule-name{font-size:8.5pt;font-weight:700;color:#0f172a;flex:1;}'
+    +'.ttp-badge{font-family:"IBM Plex Mono",monospace;font-size:7.5pt;font-weight:600;color:#0ea5e9;background:#e0f2fe;padding:1px 6px;border-radius:3px;flex-shrink:0;}'
+    +'.urg-badge{font-size:6.5pt;font-weight:700;letter-spacing:.08em;padding:1.5px 6px;border-radius:3px;flex-shrink:0;}'
+    +'.urg-immediate .urg-badge{color:#dc2626;background:#fee2e2;}'
+    +'.urg-within-30-days .urg-badge{color:#d97706;background:#fef3c7;}'
+    +'.urg-routine .urg-badge{color:#059669;background:#dcfce7;}'
+    +'.rule-card-body{padding:3mm 4mm;}'
+    +'.field-lbl{font-size:7pt;font-weight:700;letter-spacing:.12em;color:#64748b;text-transform:uppercase;margin-top:3mm;margin-bottom:1.5mm;}'
+    +'.field-lbl:first-child{margin-top:0;}'
+    +'.field-val{font-size:9pt;color:#1e293b;line-height:1.5;}'
+    +'.compose-val{font-family:"IBM Plex Mono",monospace;font-size:8pt;background:#f8fafc;padding:2mm 3mm;border-radius:3px;border:1px solid #e2e8f0;}'
+    +'.code-block{background:#0f172a;color:#67e8f9;font-family:"IBM Plex Mono",monospace;font-size:8pt;padding:3mm 4mm;border-radius:4px;border-left:3px solid #67e8f9;white-space:pre-wrap;word-break:break-all;margin-bottom:1mm;}'
+
+    /* remediation */
+    +'.rem-list{list-style:none;}'
+    +'.rem-list li{display:flex;align-items:flex-start;gap:4mm;padding:3mm 0;border-bottom:1px solid #f1f5f9;}'
+    +'.rem-list li:last-child{border-bottom:none;}'
+    +'.step-num{flex-shrink:0;width:6mm;height:6mm;background:#0ea5e9;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7.5pt;font-weight:700;margin-top:.5mm;}'
+    +'.step-text{font-size:9.5pt;color:#1e293b;line-height:1.5;}'
+
+    /* print controls */
+    +'@media screen{.print-btn{position:fixed;bottom:20px;right:20px;background:#0ea5e9;color:#fff;border:none;padding:10px 22px;font-size:11pt;font-weight:700;border-radius:6px;cursor:pointer;box-shadow:0 4px 14px rgba(14,165,233,.5);letter-spacing:.04em;}'
+    +'.print-btn:hover{background:#0284c7;}}'
+    +'@media print{.print-btn{display:none;}}'
+    +'</style></head><body>'
+
+    +'<button class="print-btn" onclick="window.print()">⬇ Save as PDF</button>'
+
+    +'<div class="page-hdr">'
+      +'<div class="brand"><span>◆</span> CONTAINER SENTINEL</div>'
+      +'<div class="conf">CONFIDENTIAL — SECURITY INTELLIGENCE</div>'
+    +'</div>'
+
+    +'<div class="report-title">'
+      +'<h1>Falco Threat Intelligence</h1>'
+      +'<h2>CONTAINER SECURITY INCIDENT REPORT</h2>'
+      +'<div class="title-rule"></div>'
+    +'</div>'
+
+    +'<div class="threat-badge '+lvlClass+'">'+E(level)+' THREAT</div>'
+
+    +'<div class="meta-grid">'
+      +'<div class="meta-row"><div class="meta-lbl">Generated</div><div class="meta-val mono">'+E(ts)+'</div></div>'
+      +'<div class="meta-row"><div class="meta-lbl">Affected Containers</div><div class="meta-val">'+E((r.affected_containers||[]).join(', ')||'—')+'</div></div>'
+      +'<div class="meta-row"><div class="meta-lbl">Total Events</div><div class="meta-val mono">'+E(r.total_events||0)+'</div></div>'
+      +'<div class="meta-row"><div class="meta-lbl">Rules Fired</div><div class="meta-val mono">'+E((r.unique_rules_fired||[]).length)+'</div></div>'
+      +'<div class="meta-row"><div class="meta-lbl">Unique Rules</div><div class="meta-val">'+E((r.unique_rules_fired||[]).join(' · ')||'—')+'</div></div>'
+    +'</div>'
+
+    +(r.summary?'<div class="summary-box">'+E(r.summary)+'</div>':'')
+
+    +'<section class="sect"><div class="sect-hdr"><span class="sect-num">01</span><span class="sect-title">Executive Summary</span></div>'
+    +(r.summary?'<p style="font-size:9.5pt;color:#1e293b;line-height:1.6;">'+E(r.summary)+'</p>':'<p style="color:#64748b;">No summary available.</p>')
+    +'</section>'
+
+    +(timelineRows?'<section class="sect"><div class="sect-hdr"><span class="sect-num">02</span><span class="sect-title">Attack Timeline</span></div><table><thead><tr><th>#</th><th>TIME</th><th>CONTAINER</th><th>RULE</th><th>PRIORITY</th></tr></thead><tbody>'+timelineRows+'</tbody></table></section>':'')
+
+    +(mitreRows?'<section class="sect"><div class="sect-hdr"><span class="sect-num">03</span><span class="sect-title">MITRE ATT&amp;CK Mappings</span></div><table><thead><tr><th>TTP ID</th><th>TACTIC</th><th>TECHNIQUE</th></tr></thead><tbody>'+mitreRows+'</tbody></table></section>':'')
+
+    +narrativeHtml
+    +rcaHtml
+    +remHtml
+
+    +'</body></html>';
+
+  var win=window.open('','_blank','width=900,height=800');
+  if(!win){alert('Pop-up blocked — please allow pop-ups for this site and try again.');return;}
+  win.document.open();win.document.write(html);win.document.close();
+  win.focus();
+}
+
+/* ── Onboarding Tour ──────────────────────────────────────── */
+const _TOUR=[
+  {title:'Welcome to Container Sentinel',
+   desc:'A security research platform for simulating container-based attacks and detecting threats with AI-powered analysis. Let\'s take a 60-second tour.',
+   target:null,pos:'center'},
+  {title:'Sidebar Navigation',
+   desc:'Navigate sections from here. Three groups: Operations (attacks & live output), Detection (Falco alerts & AI threat intel), and Reports.',
+   target:'.sidebar',pos:'right'},
+  {title:'Dashboard Overview',
+   desc:'Four live stat cards show: running containers, current threat level, total Falco events detected, and platform uptime. Auto-refreshes every 5 seconds.',
+   target:'.ov-grid',pos:'bottom',scroll:'#sec-overview'},
+  {title:'Attack Modules',
+   desc:'Launch pre-built attack simulations — privilege escalation, network scans, reverse shells, and more. Each runs inside an isolated attack container.',
+   target:'#sec-attacks .sh',pos:'bottom',scroll:'#sec-attacks'},
+  {title:'Live Output Feed',
+   desc:'Real-time attack terminal output streams here via WebSocket. Color-coded: [+] success (green), [!] warning (amber), [>] command (blue).',
+   target:'#output-box',pos:'top',scroll:'#sec-output'},
+  {title:'Falco Alert Stream',
+   desc:'Falco monitors kernel syscalls and fires when suspicious behavior is detected — shell spawning, privilege changes, writes to sensitive paths.',
+   target:'.panel-falco',pos:'right',scroll:'#sec-output'},
+  {title:'AI Threat Intelligence',
+   desc:'After running attacks, click "Run AI Analysis" to generate a full report: MITRE ATT&CK mappings, root-cause analysis per rule, and remediation steps. Use "Export PDF" to save a professional report.',
+   target:'[href="#sec-intel"]',pos:'right',last:true}
+];
+let _tIdx=0;
+
+function tourStart(){
+  _tIdx=0;
+  document.getElementById('tour-overlay').classList.add('active');
+  const d=document.getElementById('tour-dots');
+  d.innerHTML=_TOUR.map((_,i)=>`<div class="tdot" id="tdot-${i}"></div>`).join('');
+  _tourShow(0);
+}
+
+function _tourShow(idx){
+  const s=_TOUR[idx];
+  document.getElementById('tour-step-label').textContent=`STEP ${idx+1} OF ${_TOUR.length}`;
+  document.getElementById('tour-title').textContent=s.title;
+  document.getElementById('tour-desc').textContent=s.desc;
+  const prevBtn=document.getElementById('tour-prev-btn');
+  const nextBtn=document.getElementById('tour-next-btn');
+  prevBtn.style.display=idx===0?'none':'';
+  nextBtn.textContent=s.last?'Finish ✓':'Next →';
+  document.querySelectorAll('.tdot').forEach((d,i)=>d.classList.toggle('on',i===idx));
+  const doPos=()=>_tourPos(s);
+  if(s.scroll){
+    const sc=document.querySelector(s.scroll);
+    if(sc){sc.scrollIntoView({behavior:'smooth',block:'center'});}
+    setTimeout(doPos,360);
+  } else {doPos();}
+}
+
+function _tourPos(s){
+  const sl=document.getElementById('tour-spotlight');
+  const bx=document.getElementById('tour-box');
+  bx.style.display='';
+  if(!s.target){
+    sl.className='hidden';
+    bx.className='arr-none';
+    bx.style.top='50%';bx.style.left='50%';bx.style.transform='translate(-50%,-50%)';
+    return;
+  }
+  bx.style.transform='';
+  const el=document.querySelector(s.target);
+  if(!el){sl.className='hidden';return;}
+  const r=el.getBoundingClientRect();
+  const pad=8;
+  sl.className='';
+  sl.style.cssText=`top:${r.top-pad}px;left:${r.left-pad}px;width:${r.width+pad*2}px;height:${r.height+pad*2}px;`;
+  const bW=310,bH=230,vw=window.innerWidth,vh=window.innerHeight;
+  let top,left,arr='arr-none';
+  const p=s.pos||'bottom';
+  if(p==='right'){
+    top=r.top+r.height/2-bH/2;left=r.right+pad+14;
+    arr=(left+bW>vw-10)?(left=r.left-bW-14,'arr-right'):'arr-left';
+  } else if(p==='left'){
+    top=r.top+r.height/2-bH/2;left=r.left-bW-14;arr='arr-right';
+  } else if(p==='bottom'){
+    top=r.bottom+pad+14;left=r.left+r.width/2-bW/2;arr='arr-top';
+  } else if(p==='top'){
+    top=r.top-bH-pad-14;left=r.left+r.width/2-bW/2;arr='arr-bottom';
+  }
+  top=Math.max(10,Math.min(top,vh-bH-10));
+  left=Math.max(10,Math.min(left,vw-bW-10));
+  bx.className=arr;bx.style.top=top+'px';bx.style.left=left+'px';
+}
+
+function tourNext(){
+  if(_tIdx>=_TOUR.length-1){tourEnd();return;}
+  _tIdx++;_tourShow(_tIdx);
+}
+function tourPrev(){if(_tIdx<=0)return;_tIdx--;_tourShow(_tIdx);}
+function tourEnd(){
+  localStorage.setItem('sentinel_tour_done','1');
+  const ov=document.getElementById('tour-overlay');
+  ov.classList.remove('active');
+  document.getElementById('tour-box').style.display='none';
+  document.getElementById('tour-spotlight').className='hidden';
+  const c=document.getElementById('page-content');
+  if(c)c.scrollTo({top:0,behavior:'smooth'});
+}
+if(!localStorage.getItem('sentinel_tour_done'))setTimeout(tourStart,900);
+</script>
+</body>
+</html>

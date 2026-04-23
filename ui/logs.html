@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Sentinel — Run History</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F5;--bg-mid:#F8FAFB;--bg-card:#FFFFFF;--bg-card2:#F4F7FA;
+  --border:#DDE3EB;--border-hi:#C0CEDC;
+  --amber:#D97706;--amber-dim:rgba(217,119,6,.09);
+  --cyan:#0284C7;--green:#059669;--green-dim:rgba(5,150,105,.08);
+  --red:#DC2626;--orange:#EA580C;
+  --text:#0F172A;--muted:#334155;--dim:#64748B;
+  --ff-h:'Orbitron',sans-serif;--ff-b:'Rajdhani',sans-serif;--ff-m:'Share Tech Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:var(--ff-b);font-size:15px;color:var(--text);background:var(--bg);min-height:100vh;line-height:1.6;
+  background-image:
+    radial-gradient(ellipse 60% 50% at 15% 80%,rgba(2,132,199,.05) 0,transparent 100%),
+    radial-gradient(ellipse 50% 40% at 85% 10%,rgba(5,150,105,.04) 0,transparent 100%),
+    radial-gradient(circle at 1px 1px,rgba(100,116,139,.12) 1px,transparent 0);
+  background-size:auto,auto,28px 28px;
+}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:4px;}
+
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px;}
+
+.page-header{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  padding:20px 24px;margin-bottom:20px;position:relative;overflow:hidden;
+}
+.page-header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--amber),var(--cyan));}
+.ph-top{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.ph-brand{display:flex;align-items:center;gap:10px;}
+.ph-logo{width:34px;height:34px;background:var(--amber-dim);border:1px solid rgba(245,158,11,.28);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.ph-name{font-family:var(--ff-h);font-size:13px;font-weight:800;color:var(--text);}
+.ph-sub{font-family:var(--ff-m);font-size:9px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-top:1px;}
+.ph-nav{display:flex;align-items:center;gap:9px;}
+.ph-nav a,.btn-refresh{font-family:var(--ff-m);font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:.06em;padding:4px 10px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:transparent;transition:all .14s;}
+.ph-nav a:hover,.btn-refresh:hover{color:var(--text);border-color:var(--border-hi);text-decoration:none;}
+.btn-refresh{color:var(--amber);border-color:rgba(245,158,11,.28);}
+.btn-refresh:hover{background:var(--amber-dim);}
+.ph-title{font-family:var(--ff-h);font-size:20px;font-weight:800;color:var(--text);margin-top:14px;letter-spacing:.01em;}
+.ph-sub2{font-family:var(--ff-m);font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.04em;}
+
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.card-head{display:flex;align-items:center;gap:9px;padding:12px 17px;border-bottom:1px solid var(--border);background:var(--bg-card2);}
+.ch-title{font-family:var(--ff-h);font-size:12px;font-weight:700;color:var(--text);letter-spacing:.04em;text-transform:uppercase;}
+.ch-right{margin-left:auto;}
+
+/* HISTORY TABLE */
+.hist-tbl{width:100%;border-collapse:collapse;}
+.hist-tbl th{text-align:left;padding:9px 15px;font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);background:var(--bg-card2);}
+.hist-tbl td{padding:10px 15px;border-bottom:1px solid var(--border);font-size:12px;}
+.hist-tbl tr:last-child td{border-bottom:none;}
+.hist-tbl tr:hover td{background:rgba(0,0,0,.025);}
+.hist-tbl td:first-child{font-family:var(--ff-m);font-size:11px;color:var(--dim);}
+.hist-tbl td:nth-child(2){font-family:var(--ff-m);font-size:10.5px;color:var(--muted);}
+
+.status-ok{font-family:var(--ff-m);font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--green);}
+.status-failed{font-family:var(--ff-m);font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--red);}
+.status-running{font-family:var(--ff-m);font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--amber);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.btn-expand{
+  font-family:var(--ff-m);font-size:9.5px;font-weight:600;letter-spacing:.06em;
+  padding:3px 9px;border:1px solid var(--border);border-radius:4px;background:transparent;
+  color:var(--muted);cursor:pointer;transition:all .14s;
+}
+.btn-expand:hover{border-color:var(--border-hi);color:var(--text);}
+.btn-expand.open{border-color:rgba(245,158,11,.3);color:var(--amber);background:var(--amber-dim);}
+
+/* OUTPUT PANEL */
+.output-panel{
+  display:none;background:var(--bg-card2);border-top:1px solid var(--border);
+  padding:11px 15px;font-family:var(--ff-m);font-size:10.5px;line-height:1.7;
+  white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;
+}
+.output-panel.open{display:block;}
+.line-plus{color:var(--green);font-weight:500;}
+.line-bang{color:var(--red);font-weight:500;}
+.line-cmd{color:var(--cyan);opacity:.8;}
+.line-ok{color:var(--muted);}
+
+#empty-msg{color:var(--dim);text-align:center;padding:24px;font-family:var(--ff-m);font-size:11px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-header">
+    <div class="ph-top">
+      <div class="ph-brand">
+        <div class="ph-logo">🛡</div>
+        <div>
+          <div class="ph-name">Container Sentinel</div>
+          <div class="ph-sub">Attack Run History</div>
+        </div>
+      </div>
+      <div class="ph-nav">
+        <button class="btn-refresh" onclick="loadHistory()">↻ Refresh</button>
+        <a href="/">← Dashboard</a>
+        <a href="/report">Latest Report</a>
+        <a href="/scanner">Image Scanner</a>
+      </div>
+    </div>
+    <div class="ph-title">Run History</div>
+    <div class="ph-sub2">All recorded attack executions this session</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span style="font-size:14px;color:var(--amber)">≡</span>
+      <span class="ch-title">Execution Log</span>
+    </div>
+    <div style="padding:0">
+      <table class="hist-tbl">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th style="width:160px">Timestamp</th>
+            <th>Attack</th>
+            <th style="width:90px">Status</th>
+            <th style="width:80px">Duration</th>
+            <th style="width:60px">Exit</th>
+            <th style="width:60px">Lines</th>
+            <th style="width:80px">Detail</th>
+          </tr>
+        </thead>
+        <tbody id="hist-tbody">
+          <tr><td colspan="8" id="empty-msg">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const LABEL_MAP={
+  docker_socket:'Docker Socket Abuse',
+  nsenter_escape:'Privileged Nsenter Escape',
+  lateral_redis:'Redis Lateral Movement',
+  runc_cve:'CVE-2025-31133 Runc Symlink Swap',
+  authz_bypass:'CVE-2026-34040 Docker AuthZ Bypass',
+};
+
+async function loadHistory(){
+  const tbody=document.getElementById('hist-tbody');
+  tbody.innerHTML='<tr><td colspan="8" id="empty-msg">Loading...</td></tr>';
+  try{
+    const res=await fetch('/api/attacks/history');const runs=await res.json();
+    if(!runs.length){tbody.innerHTML='<tr><td colspan="8" id="empty-msg">No attack runs recorded yet.</td></tr>';return;}
+    tbody.innerHTML='';
+    runs.forEach((r,idx)=>{
+      const num=runs.length-idx;
+      const ts=(r.started_at||'').replace('T',' ').slice(0,19);
+      const label=LABEL_MAP[r.attack_type]||r.attack_type;
+      const dur=r.duration_seconds!=null?r.duration_seconds.toFixed(1)+'s':'—';
+      const scls=r.status==='success'?'status-ok':r.status==='running'?'status-running':'status-failed';
+
+      const tr=document.createElement('tr');
+      tr.id='row-'+r.id;
+      tr.innerHTML=
+        `<td>${num}</td>`+
+        `<td>${ts}</td>`+
+        `<td style="color:var(--text);font-size:12.5px">${label}</td>`+
+        `<td><span class="${scls}">${r.status.toUpperCase()}</span></td>`+
+        `<td style="font-family:var(--ff-m);font-size:11px;color:var(--muted)">${dur}</td>`+
+        `<td style="font-family:var(--ff-m);font-size:11px;color:var(--dim)">${r.exit_code??'—'}</td>`+
+        `<td style="font-family:var(--ff-m);font-size:11px;color:var(--dim)">${r.line_count}</td>`+
+        `<td><button class="btn-expand" id="expand-${r.id}" onclick="toggleDetail('${r.id}')">Expand</button></td>`;
+      tbody.appendChild(tr);
+
+      const detail=document.createElement('tr');
+      detail.id='detail-'+r.id;
+      const td=document.createElement('td');
+      td.colSpan=8;td.style.padding='0';
+      const panel=document.createElement('div');
+      panel.className='output-panel';panel.id='panel-'+r.id;panel.textContent='Loading...';
+      td.appendChild(panel);detail.appendChild(td);tbody.appendChild(detail);
+    });
+  }catch(e){tbody.innerHTML=`<tr><td colspan="8" id="empty-msg" style="color:var(--red)">Error: ${e.message}</td></tr>`;}
+}
+
+async function toggleDetail(runId){
+  const panel=document.getElementById('panel-'+runId);
+  const btn=document.getElementById('expand-'+runId);
+  if(panel.classList.contains('open')){panel.classList.remove('open');btn.classList.remove('open');btn.textContent='Expand';return;}
+  panel.textContent='Loading...';panel.classList.add('open');btn.classList.add('open');btn.textContent='Collapse';
+  try{
+    const res=await fetch('/api/attacks/history/'+runId);const data=await res.json();
+    panel.innerHTML='';
+    (data.output||[]).forEach(line=>{
+      const div=document.createElement('div');
+      let cls='line-ok';
+      if(line.startsWith('[+]'))cls='line-plus';
+      else if(line.startsWith('[!]'))cls='line-bang';
+      else if(line.startsWith('[>]'))cls='line-cmd';
+      div.className=cls;div.textContent=line;panel.appendChild(div);
+    });
+    if(!data.output||!data.output.length)panel.textContent='(no output recorded)';
+  }catch(e){panel.textContent='Error loading output: '+e.message;}
+}
+
+loadHistory();
+</script>
+</body>
+</html>

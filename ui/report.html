@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Sentinel — Security Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F5;--bg-mid:#F8FAFB;--bg-card:#FFFFFF;--bg-card2:#F4F7FA;
+  --border:#DDE3EB;--border-hi:#C0CEDC;
+  --amber:#D97706;--amber-dim:rgba(217,119,6,.09);
+  --cyan:#0284C7;--cyan-dim:rgba(2,132,199,.08);
+  --green:#059669;--green-dim:rgba(5,150,105,.08);
+  --red:#DC2626;--red-dim:rgba(220,38,38,.08);
+  --orange:#EA580C;--orange-dim:rgba(234,88,12,.09);
+  --falco:#0284C7;
+  --text:#0F172A;--muted:#334155;--dim:#64748B;
+  --ff-h:'Orbitron',sans-serif;--ff-b:'Rajdhani',sans-serif;--ff-m:'Share Tech Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:var(--ff-b);font-size:15px;color:var(--text);background:var(--bg);min-height:100vh;line-height:1.6;
+  background-image:
+    radial-gradient(ellipse 60% 50% at 15% 80%,rgba(2,132,199,.05) 0,transparent 100%),
+    radial-gradient(ellipse 50% 40% at 85% 10%,rgba(5,150,105,.04) 0,transparent 100%),
+    radial-gradient(circle at 1px 1px,rgba(100,116,139,.12) 1px,transparent 0);
+  background-size:auto,auto,28px 28px;
+}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:4px;}
+
+.wrap{max-width:1000px;margin:0 auto;padding:28px 20px 60px;}
+
+/* HEADER */
+.rpt-header{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  padding:26px 28px;margin-bottom:22px;position:relative;overflow:hidden;
+}
+.rpt-header::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--red),var(--amber),var(--cyan));
+}
+.rpt-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px;}
+.rpt-brand{display:flex;align-items:center;gap:10px;}
+.rpt-logo{width:36px;height:36px;background:var(--amber-dim);border:1px solid rgba(245,158,11,.28);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.rpt-brand-name{font-family:var(--ff-h);font-size:13px;font-weight:800;color:var(--text);}
+.rpt-brand-sub{font-family:var(--ff-m);font-size:9px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-top:1px;}
+.rpt-nav{display:flex;align-items:center;gap:10px;}
+.rpt-nav a{font-family:var(--ff-m);font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:.06em;padding:4px 10px;border:1px solid var(--border);border-radius:4px;transition:all .14s;}
+.rpt-nav a:hover{color:var(--text);border-color:var(--border-hi);}
+.rpt-title{font-family:var(--ff-h);font-size:24px;font-weight:900;color:var(--text);letter-spacing:.01em;margin-bottom:6px;}
+.rpt-sub{font-family:var(--ff-m);font-size:11px;color:var(--muted);letter-spacing:.04em;}
+
+/* STAT ROW */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.stat-box{background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:13px 15px;}
+.stat-lbl{font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.stat-val{font-family:var(--ff-h);font-size:22px;font-weight:800;color:var(--text);line-height:1;}
+.stat-val.sev-critical{color:var(--red);}
+.stat-val.sev-high{color:var(--orange);}
+.stat-val.sev-medium{color:var(--amber);}
+.stat-val.sev-low{color:var(--green);}
+
+/* SECTION */
+.sec{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.sec-head{display:flex;align-items:center;gap:9px;padding:13px 18px;border-bottom:1px solid var(--border);background:var(--bg-card2);}
+.sec-icon{font-size:14px;}
+.sec-title{font-family:var(--ff-h);font-size:12px;font-weight:700;color:var(--text);letter-spacing:.04em;text-transform:uppercase;}
+.sec-body{padding:18px;}
+
+/* KV GRID */
+.kv{display:grid;grid-template-columns:160px 1fr;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.kv-row{display:contents;}
+.kv-k{font-family:var(--ff-m);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:8px 13px;background:var(--bg-card2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);}
+.kv-v{font-family:var(--ff-m);font-size:11px;color:var(--muted);padding:8px 13px;border-bottom:1px solid var(--border);}
+.kv-row:last-child .kv-k,.kv-row:last-child .kv-v{border-bottom:none;}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px;}
+.tbl th{text-align:left;padding:7px 12px;font-family:var(--ff-m);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);background:var(--bg-card2);}
+.tbl td{padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--ff-m);font-size:10.5px;color:var(--muted);vertical-align:top;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(0,0,0,.025);}
+
+.sev-badge{display:inline-block;font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:4px;}
+.sev-critical{color:var(--red);background:var(--red-dim);border:1px solid rgba(239,68,68,.22);}
+.sev-high{color:var(--orange);background:var(--orange-dim);border:1px solid rgba(249,115,22,.22);}
+.sev-medium{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(245,158,11,.22);}
+.sev-low{color:var(--green);background:var(--green-dim);border:1px solid rgba(16,185,129,.22);}
+
+/* MISCONFIG TAGS */
+.flag-tag{display:inline-block;font-family:var(--ff-m);font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:var(--red-dim);border:1px solid rgba(239,68,68,.2);color:var(--red);margin:2px 3px 2px 0;}
+
+/* PROSE */
+.prose{font-size:12.5px;color:var(--muted);line-height:1.7;}
+
+/* REMEDIATION LIST */
+.rem-list{list-style:none;padding:0;counter-reset:rem;}
+.rem-list li{
+  counter-increment:rem;padding:9px 13px;border-bottom:1px solid var(--border);
+  font-size:12.5px;color:var(--muted);line-height:1.6;display:flex;gap:10px;
+}
+.rem-list li:last-child{border-bottom:none;}
+.rem-list li::before{
+  content:counter(rem,'0'counter(rem));font-family:var(--ff-m);font-size:10px;font-weight:700;
+  color:var(--amber);flex-shrink:0;padding-top:1px;min-width:24px;
+}
+
+/* EMPTY STATE */
+#no-report{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:12px;}
+.no-icon{font-size:40px;opacity:.2;}
+.no-msg{font-family:var(--ff-h);font-size:15px;font-weight:700;color:var(--muted);}
+.no-sub{font-family:var(--ff-m);font-size:11px;color:var(--dim);letter-spacing:.04em;}
+
+#report-content{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="no-report">
+    <div class="no-icon">🛡</div>
+    <div class="no-msg">Loading report...</div>
+    <div class="no-sub">Fetching latest agent findings</div>
+  </div>
+
+  <div id="report-content">
+
+    <!-- HEADER -->
+    <div class="rpt-header">
+      <div class="rpt-header-top">
+        <div class="rpt-brand">
+          <div class="rpt-logo">🛡</div>
+          <div>
+            <div class="rpt-brand-name">Container Sentinel</div>
+            <div class="rpt-brand-sub">Agent Security Report</div>
+          </div>
+        </div>
+        <div class="rpt-nav">
+          <a href="/">← Dashboard</a>
+          <a href="/logs">Run History</a>
+          <a href="/scanner">Image Scanner</a>
+        </div>
+      </div>
+      <div class="rpt-title" id="r-attack-label">—</div>
+      <div class="rpt-sub" id="r-timestamp">—</div>
+      <div class="stat-row" style="margin-top:18px">
+        <div class="stat-box">
+          <div class="stat-lbl">Overall Severity</div>
+          <div class="stat-val" id="r-severity">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lbl">CVSS Score</div>
+          <div class="stat-val" id="r-cvss">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lbl">MITRE TTP</div>
+          <div class="stat-val" style="font-size:16px" id="r-ttp">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lbl">Tactic</div>
+          <div class="stat-val" style="font-size:14px" id="r-tactic">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCANNER FINDINGS -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-icon" style="color:var(--cyan)">◉</span>
+        <span class="sec-title">Scanner Findings</span>
+      </div>
+      <div class="sec-body">
+        <div style="font-family:var(--ff-h);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">Vulnerabilities (CVEs)</div>
+        <table class="tbl">
+          <thead><tr><th>CVE ID</th><th>Severity</th><th>Package</th><th>Fix</th></tr></thead>
+          <tbody id="r-cves"><tr><td colspan="4" style="color:var(--dim)">No CVE data</td></tr></tbody>
+        </table>
+        <div style="margin-top:16px;">
+          <div style="font-family:var(--ff-h);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:7px;">Misconfigurations</div>
+          <div id="r-misconfigs" style="font-size:12px;color:var(--muted)">—</div>
+        </div>
+        <div style="margin-top:14px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;">
+          <div style="font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:5px;">Scanner Summary</div>
+          <div class="prose" id="r-scanner-summary">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONITOR ANALYSIS -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-icon" style="color:var(--amber)">◉</span>
+        <span class="sec-title">Monitor Analysis</span>
+      </div>
+      <div class="sec-body">
+        <div class="kv">
+          <div class="kv-row"><span class="kv-k">Technique</span><span class="kv-v" id="r-technique">—</span></div>
+          <div class="kv-row"><span class="kv-k">TTP Code</span><span class="kv-v" id="r-mon-ttp">—</span></div>
+          <div class="kv-row"><span class="kv-k">Tactic</span><span class="kv-v" id="r-mon-tactic">—</span></div>
+          <div class="kv-row"><span class="kv-k">CVSS Score</span><span class="kv-v" id="r-mon-cvss">—</span></div>
+          <div class="kv-row"><span class="kv-k">Vector</span><span class="kv-v" id="r-mon-vector">—</span></div>
+          <div class="kv-row"><span class="kv-k">Description</span><span class="kv-v" id="r-mon-desc">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NETWORK ANALYSIS -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-icon" style="color:var(--falco)">◉</span>
+        <span class="sec-title">Network Analysis</span>
+      </div>
+      <div class="sec-body">
+        <div class="kv">
+          <div class="kv-row"><span class="kv-k">Pivot Path</span><span class="kv-v" id="r-net-pivot">—</span></div>
+          <div class="kv-row"><span class="kv-k">Host Breach</span><span class="kv-v" id="r-net-breach">—</span></div>
+          <div class="kv-row"><span class="kv-k">Summary</span><span class="kv-v" id="r-net-summary">—</span></div>
+        </div>
+        <div style="font-family:var(--ff-h);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:7px;margin-top:4px;">Exposed Services</div>
+        <div id="r-net-exposed" style="font-family:var(--ff-m);font-size:11px;color:var(--muted)">—</div>
+      </div>
+    </div>
+
+    <!-- REMEDIATION -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-icon" style="color:var(--green)">◉</span>
+        <span class="sec-title">Remediation</span>
+      </div>
+      <div class="sec-body">
+        <div style="padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:14px;">
+          <div style="font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:5px;">Root Cause</div>
+          <div class="prose" id="r-root-cause">—</div>
+        </div>
+        <div style="font-family:var(--ff-h);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">Recommended Actions</div>
+        <div id="r-remediation" class="prose">—</div>
+        <div style="padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-top:14px;">
+          <div style="font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:5px;">Report Summary</div>
+          <div class="prose" id="r-report-summary">—</div>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;font-family:var(--ff-m);font-size:10px;color:var(--dim);">
+          <span>Report ID: </span><span id="r-id" style="color:var(--muted)">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#report-content -->
+</div>
+
+<script>
+async function loadReport(){
+  try{
+    const res=await fetch('/api/agents/findings/latest');
+    if(!res.ok){
+      document.getElementById('no-report').innerHTML='<div class="no-icon">🛡</div><div class="no-msg">No report available</div><div class="no-sub">Run an attack from the dashboard first</div>';
+      return;
+    }
+    const data=await res.json();
+    renderReport(data);
+  }catch(e){
+    document.getElementById('no-report').innerHTML=`<div class="no-icon">⚠</div><div class="no-msg">Error loading report</div><div class="no-sub">${e.message}</div>`;
+  }
+}
+
+function renderReport(r){
+  document.getElementById('no-report').style.display='none';
+  document.getElementById('report-content').style.display='block';
+
+  setText('r-attack-label',r.attack_label||r.attack_type||'Unknown Attack');
+  setText('r-timestamp',(r.timestamp||'').replace('T',' ').slice(0,19)+' UTC');
+
+  const sev=(r.overall_severity||'UNKNOWN').toLowerCase();
+  const sevEl=document.getElementById('r-severity');
+  sevEl.textContent=r.overall_severity||'—';
+  sevEl.className='stat-val sev-'+sev;
+  setText('r-cvss',r.cvss_score!=null?String(r.cvss_score):'—');
+  setText('r-ttp',r.mitre_ttp||'—');
+  setText('r-tactic',r.mitre_tactic||'—');
+  setText('r-id',r.id||'—');
+
+  const f=r.findings||{};
+
+  // Scanner
+  const sc=f.scanner||{};
+  const cveBody=document.getElementById('r-cves');
+  const cves=sc.cves||[];
+  if(cves.length){
+    cveBody.innerHTML='';
+    cves.forEach(c=>{
+      const sc_=(c.severity||'').toLowerCase();
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td style="font-weight:600;color:var(--text)">${esc(c.id)}</td><td><span class="sev-badge sev-${sc_}">${esc(c.severity)}</span></td><td>${esc(c.package)}</td><td style="color:var(--green)">${esc(c.fix)}</td>`;
+      cveBody.appendChild(tr);
+    });
+  }
+  const misconfigs=sc.misconfigs||[];
+  const mc=document.getElementById('r-misconfigs');
+  if(misconfigs.length){mc.innerHTML=misconfigs.map(m=>`<span class="flag-tag">${esc(m)}</span>`).join('');}
+  else{mc.textContent='None detected';}
+  setText('r-scanner-summary',sc.summary||'—');
+
+  // Monitor
+  const mon=f.monitor||{};
+  setText('r-technique',mon.technique||'—');
+  setText('r-mon-ttp',mon.ttp||'—');
+  setText('r-mon-tactic',mon.tactic||'—');
+  setText('r-mon-cvss',mon.cvss!=null?String(mon.cvss)+(mon.vector?' — '+mon.vector:''):'—');
+  setText('r-mon-vector',mon.vector||'—');
+  setText('r-mon-desc',mon.description||'—');
+
+  // Network
+  const net=f.network||{};
+  setText('r-net-pivot',net.pivot_path||'—');
+  const breachEl=document.getElementById('r-net-breach');
+  breachEl.textContent=net.host_breach?'YES — Host namespace compromised':'NO';
+  breachEl.style.color=net.host_breach?'var(--red)':'var(--green)';
+  setText('r-net-summary',net.summary||'—');
+  const expEl=document.getElementById('r-net-exposed');
+  const exposed=net.exposed||[];
+  expEl.textContent=exposed.length?exposed.join('\n'):'None detected';
+
+  // Reporter
+  const rep=f.reporter||{};
+  setText('r-root-cause',rep.root_cause||'—');
+  setText('r-remediation',rep.remediation||'—');
+  setText('r-report-summary',rep.summary||'—');
+}
+
+function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+loadReport();
+</script>
+</body>
+</html>

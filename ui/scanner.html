@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Sentinel — Image Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F5;--bg-mid:#F8FAFB;--bg-card:#FFFFFF;--bg-card2:#F4F7FA;
+  --border:#DDE3EB;--border-hi:#C0CEDC;
+  --amber:#D97706;--amber-dim:rgba(217,119,6,.09);
+  --cyan:#0284C7;--cyan-dim:rgba(2,132,199,.08);
+  --green:#059669;--green-dim:rgba(5,150,105,.08);
+  --red:#DC2626;--red-dim:rgba(220,38,38,.08);
+  --orange:#EA580C;--orange-dim:rgba(234,88,12,.09);
+  --text:#0F172A;--muted:#334155;--dim:#64748B;
+  --ff-h:'Orbitron',sans-serif;--ff-b:'Rajdhani',sans-serif;--ff-m:'Share Tech Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:var(--ff-b);font-size:15px;color:var(--text);background:var(--bg);min-height:100vh;line-height:1.6;
+  background-image:
+    radial-gradient(ellipse 60% 50% at 15% 80%,rgba(2,132,199,.05) 0,transparent 100%),
+    radial-gradient(ellipse 50% 40% at 85% 10%,rgba(5,150,105,.04) 0,transparent 100%),
+    radial-gradient(circle at 1px 1px,rgba(100,116,139,.12) 1px,transparent 0);
+  background-size:auto,auto,28px 28px;
+}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:4px;}
+
+.wrap{max-width:1060px;margin:0 auto;padding:28px 20px 60px;}
+
+/* PAGE HEADER */
+.ph{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:22px 26px;margin-bottom:22px;position:relative;overflow:hidden;}
+.ph::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--green),var(--amber));}
+.ph-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px;}
+.ph-brand{display:flex;align-items:center;gap:10px;}
+.ph-logo{width:36px;height:36px;background:var(--cyan-dim);border:1px solid rgba(34,211,238,.28);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.ph-name{font-family:var(--ff-h);font-size:13px;font-weight:800;color:var(--text);}
+.ph-sub{font-family:var(--ff-m);font-size:9px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-top:1px;}
+.ph-nav{display:flex;align-items:center;gap:9px;}
+.ph-nav a{font-family:var(--ff-m);font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:.06em;padding:4px 10px;border:1px solid var(--border);border-radius:4px;transition:all .14s;}
+.ph-nav a:hover{color:var(--text);border-color:var(--border-hi);text-decoration:none;}
+.ph-title{font-family:var(--ff-h);font-size:22px;font-weight:900;color:var(--text);letter-spacing:.01em;}
+.ph-desc{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.6;max-width:640px;}
+.ai-badge{
+  display:inline-flex;align-items:center;gap:5px;margin-top:10px;
+  font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--cyan);background:var(--cyan-dim);border:1px solid rgba(34,211,238,.22);
+  border-radius:4px;padding:3px 9px;
+}
+
+/* SCAN INPUT */
+.scan-input-wrap{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  padding:22px 24px;margin-bottom:20px;
+}
+.sil{font-family:var(--ff-h);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.input-row{display:flex;gap:10px;align-items:stretch;}
+.scan-input{
+  flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;
+  padding:11px 14px;font-family:var(--ff-m);font-size:13px;color:var(--text);
+  outline:none;transition:border-color .14s;letter-spacing:.02em;
+}
+.scan-input::placeholder{color:var(--dim);}
+.scan-input:focus{border-color:rgba(2,132,199,.5);}
+.btn-scan{
+  font-family:var(--ff-h);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:#FFFFFF;background:var(--cyan);border:none;border-radius:7px;
+  padding:11px 26px;cursor:pointer;white-space:nowrap;transition:all .14s;flex-shrink:0;
+}
+.btn-scan:hover{background:#0369A1;box-shadow:0 0 20px rgba(2,132,199,.35);transform:translateY(-1px);}
+.btn-scan:disabled{background:var(--border-hi);color:var(--dim);cursor:not-allowed;transform:none;box-shadow:none;}
+
+.quick-picks{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap;}
+.qp-lbl{font-family:var(--ff-m);font-size:10px;color:var(--dim);letter-spacing:.06em;}
+.qp{
+  font-family:var(--ff-m);font-size:10px;color:var(--muted);background:transparent;
+  border:1px solid var(--border);border-radius:4px;padding:3px 9px;cursor:pointer;transition:all .14s;
+}
+.qp:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-dim);}
+
+/* SCAN PROGRESS */
+#scan-progress{display:none;margin-bottom:20px;}
+.prog-card{
+  background:var(--bg-card);border:1px solid rgba(34,211,238,.3);border-radius:12px;
+  padding:20px 24px;position:relative;overflow:hidden;
+}
+.prog-card::after{
+  content:'';position:absolute;top:0;left:-100%;width:100%;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:scan-line 1.8s linear infinite;
+}
+@keyframes scan-line{0%{left:-100%}100%{left:100%}}
+.prog-title{font-family:var(--ff-h);font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.prog-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px rgba(34,211,238,.6);animation:pulse 1s infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.prog-steps{display:flex;flex-direction:column;gap:6px;}
+.prog-step{display:flex;align-items:center;gap:9px;font-family:var(--ff-m);font-size:11px;color:var(--dim);}
+.prog-step.active{color:var(--cyan);}
+.prog-step.done{color:var(--green);}
+.step-dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0;}
+.prog-step.active .step-dot{background:var(--cyan);box-shadow:0 0 6px rgba(34,211,238,.5);animation:pulse 1s infinite;}
+.prog-step.done  .step-dot{background:var(--green);}
+
+/* RESULTS */
+#scan-results{display:none;}
+
+/* RISK BANNER */
+.risk-banner{
+  border-radius:12px;padding:22px 26px;margin-bottom:18px;position:relative;overflow:hidden;
+  background:var(--bg-card);border:1px solid var(--border);
+}
+.risk-banner.risk-critical{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.04);}
+.risk-banner.risk-high    {border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.04);}
+.risk-banner.risk-medium  {border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.04);}
+.risk-banner.risk-low     {border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.04);}
+.risk-banner.risk-clean   {border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.04);}
+.risk-banner::before{content:'';position:absolute;top:0;left:0;width:4px;bottom:0;border-radius:12px 0 0 12px;}
+.risk-banner.risk-critical::before{background:var(--red);}
+.risk-banner.risk-high::before{background:var(--orange);}
+.risk-banner.risk-medium::before{background:var(--amber);}
+.risk-banner.risk-low::before,.risk-banner.risk-clean::before{background:var(--green);}
+.risk-grid{display:grid;grid-template-columns:auto 1fr;gap:0 28px;align-items:center;}
+.risk-score-big{font-family:var(--ff-h);font-size:56px;font-weight:900;line-height:1;letter-spacing:-.02em;}
+.risk-critical .risk-score-big{color:var(--red);}
+.risk-high     .risk-score-big{color:var(--orange);}
+.risk-medium   .risk-score-big{color:var(--amber);}
+.risk-low      .risk-score-big,.risk-clean .risk-score-big{color:var(--green);}
+.risk-level-lbl{font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;}
+.risk-critical .risk-level-lbl{color:var(--red);}
+.risk-high     .risk-level-lbl{color:var(--orange);}
+.risk-medium   .risk-level-lbl{color:var(--amber);}
+.risk-low      .risk-level-lbl,.risk-clean .risk-level-lbl{color:var(--green);}
+.risk-image{font-family:var(--ff-m);font-size:13px;color:var(--text);font-weight:600;margin-bottom:5px;}
+.risk-exec{font-size:12.5px;color:var(--muted);line-height:1.6;max-width:600px;}
+.risk-rationale{font-family:var(--ff-m);font-size:10px;color:var(--dim);margin-top:6px;}
+
+/* SEVERITY BAR */
+.sev-bars{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.sev-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center;}
+.sev-num{font-family:var(--ff-h);font-size:30px;font-weight:900;line-height:1;margin-bottom:4px;}
+.sev-bar.s-critical .sev-num{color:var(--red);}
+.sev-bar.s-high     .sev-num{color:var(--orange);}
+.sev-bar.s-medium   .sev-num{color:var(--amber);}
+.sev-bar.s-low      .sev-num{color:var(--green);}
+.sev-lbl{font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;}
+.sev-bar.s-critical .sev-lbl{color:var(--red);}
+.sev-bar.s-high     .sev-lbl{color:var(--orange);}
+.sev-bar.s-medium   .sev-lbl{color:var(--amber);}
+.sev-bar.s-low      .sev-lbl{color:var(--green);}
+.sev-bar-track{height:3px;border-radius:2px;margin-top:8px;background:var(--border);}
+.sev-bar-fill{height:100%;border-radius:2px;transition:width .5s ease;}
+.s-critical .sev-bar-fill{background:var(--red);}
+.s-high     .sev-bar-fill{background:var(--orange);}
+.s-medium   .sev-bar-fill{background:var(--amber);}
+.s-low      .sev-bar-fill{background:var(--green);}
+
+/* CARD */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.card.a-cyan{border-left:2px solid var(--cyan);}
+.card.a-red{border-left:2px solid var(--red);}
+.card.a-green{border-left:2px solid var(--green);}
+.card.a-amber{border-left:2px solid var(--amber);}
+.ch{display:flex;align-items:center;gap:9px;padding:12px 17px;border-bottom:1px solid var(--border);background:var(--bg-card2);}
+.ch-icon{font-size:14px;flex-shrink:0;}
+.ch-title{font-family:var(--ff-h);font-size:12px;font-weight:700;color:var(--text);letter-spacing:.04em;text-transform:uppercase;}
+.ch-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.ch-count{font-family:var(--ff-m);font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.06em;}
+
+/* CVE TABLE */
+.cve-tbl{width:100%;border-collapse:collapse;}
+.cve-tbl th{text-align:left;padding:8px 14px;font-family:var(--ff-m);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);background:var(--bg-card2);}
+.cve-tbl td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.cve-tbl tr:last-child td{border-bottom:none;}
+.cve-tbl tr:hover td{background:rgba(0,0,0,.025);}
+
+.cve-id{font-family:var(--ff-m);font-size:11px;font-weight:600;color:var(--text);}
+.cve-title{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
+.sev-badge{display:inline-block;font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:4px;}
+.sb-critical{color:var(--red);background:var(--red-dim);border:1px solid rgba(239,68,68,.22);}
+.sb-high{color:var(--orange);background:var(--orange-dim);border:1px solid rgba(249,115,22,.22);}
+.sb-medium{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(245,158,11,.22);}
+.sb-low{color:var(--green);background:var(--green-dim);border:1px solid rgba(16,185,129,.22);}
+.sb-unknown{color:var(--muted);background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.22);}
+
+.cvss-score{font-family:var(--ff-m);font-size:11px;font-weight:700;}
+.cvss-high{color:var(--red);}
+.cvss-medium{color:var(--amber);}
+.cvss-low{color:var(--green);}
+
+.pkg-name{font-family:var(--ff-m);font-size:11px;color:var(--text);}
+.pkg-ver{font-family:var(--ff-m);font-size:10px;color:var(--muted);margin-top:1px;}
+.fix-val{font-family:var(--ff-m);font-size:10.5px;}
+.fix-avail{color:var(--green);}
+.fix-none{color:var(--dim);}
+
+/* MISCONFIG */
+.mc-item{
+  padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;
+}
+.mc-item:last-child{border-bottom:none;}
+.mc-sev{flex-shrink:0;padding-top:1px;}
+.mc-title{font-size:12.5px;color:var(--text);font-weight:500;margin-bottom:2px;}
+.mc-id{font-family:var(--ff-m);font-size:10px;color:var(--dim);margin-bottom:4px;}
+.mc-desc{font-size:11.5px;color:var(--muted);line-height:1.5;}
+.mc-res{font-size:11px;color:var(--cyan);margin-top:4px;}
+
+/* REMEDIATION */
+.rem-list{list-style:none;padding:0;counter-reset:r;}
+.rem-list li{
+  counter-increment:r;padding:11px 16px;border-bottom:1px solid var(--border);
+  display:flex;gap:12px;align-items:flex-start;
+}
+.rem-list li:last-child{border-bottom:none;}
+.rem-list li::before{
+  content:counter(r,'0'counter(r));font-family:var(--ff-m);font-size:11px;font-weight:700;
+  color:var(--cyan);flex-shrink:0;padding-top:1px;min-width:26px;
+}
+.rem-text{font-size:12.5px;color:var(--muted);line-height:1.6;}
+
+/* COMPLIANCE BOX */
+.compliance-box{
+  background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;
+  padding:14px 16px;font-size:12.5px;color:var(--muted);line-height:1.7;
+}
+.compliance-box strong{color:var(--amber);font-weight:600;}
+
+/* SCAN META */
+.scan-meta{
+  display:flex;align-items:center;gap:16px;
+  font-family:var(--ff-m);font-size:10px;color:var(--dim);
+  margin-top:16px;padding-top:12px;border-top:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.scan-meta span{display:flex;align-items:center;gap:5px;}
+
+/* EMPTY TABLES */
+.empty-row td{padding:20px 14px;color:var(--dim);font-family:var(--ff-m);font-size:11px;text-align:center;}
+
+/* ROOT CAUSE ANALYSIS */
+.rca-list{list-style:none;padding:0;}
+.rca-item{border-bottom:1px solid var(--border);}
+.rca-item:last-child{border-bottom:none;}
+.rca-header{
+  display:flex;align-items:center;gap:10px;padding:13px 17px;cursor:pointer;
+  transition:background .14s;user-select:none;
+}
+.rca-header:hover{background:rgba(0,0,0,.025);}
+.rca-header.open{background:rgba(220,38,38,.03);}
+.rca-cve-id{font-family:var(--ff-m);font-size:12px;font-weight:700;color:var(--text);min-width:140px;}
+.rca-pkg{font-family:var(--ff-m);font-size:11px;color:var(--muted);}
+.rca-chevron{margin-left:auto;font-size:12px;color:var(--dim);transition:transform .2s;flex-shrink:0;}
+.rca-header.open .rca-chevron{transform:rotate(180deg);}
+.urgency-badge{
+  font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.07em;
+  padding:2px 8px;border-radius:4px;flex-shrink:0;
+}
+.ub-immediate{color:var(--red);background:var(--red-dim);border:1px solid rgba(220,38,38,.22);}
+.ub-within-30-days{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(217,119,6,.22);}
+.ub-routine{color:var(--green);background:var(--green-dim);border:1px solid rgba(5,150,105,.22);}
+
+.rca-body{display:none;padding:0 17px 16px;border-top:1px solid var(--border);background:var(--bg-card2);}
+.rca-body.open{display:block;}
+.rca-section{margin-top:12px;}
+.rca-section-label{
+  font-family:var(--ff-m);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:5px;
+}
+.rca-text{font-size:12.5px;color:var(--muted);line-height:1.65;}
+.rca-fix-box{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:7px;
+  padding:10px 14px;display:flex;align-items:center;gap:10px;margin-top:5px;
+}
+.rca-fix-cmd{font-family:var(--ff-m);font-size:11.5px;color:var(--cyan);flex:1;word-break:break-all;}
+.btn-copy-fix{
+  font-family:var(--ff-m);font-size:9px;font-weight:600;letter-spacing:.06em;
+  padding:4px 10px;border:1px solid rgba(2,132,199,.3);border-radius:4px;
+  color:var(--cyan);background:var(--cyan-dim);cursor:pointer;transition:all .14s;flex-shrink:0;white-space:nowrap;
+}
+.btn-copy-fix:hover{background:rgba(2,132,199,.18);}
+.btn-copy-fix.copied{color:var(--green);border-color:rgba(5,150,105,.3);background:var(--green-dim);}
+.rca-dockerfile{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:7px;
+  padding:9px 14px;font-family:var(--ff-m);font-size:11px;color:var(--text);
+  margin-top:5px;word-break:break-all;
+}
+.df-label{font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;}
+
+/* SECRETS CHIP */
+.secret-chip{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--ff-m);font-size:10px;font-weight:700;
+  letter-spacing:.06em;padding:3px 9px;border-radius:4px;background:var(--red-dim);
+  border:1px solid rgba(239,68,68,.22);color:var(--red);
+}
+
+/* ERROR */
+.err-box{background:var(--red-dim);border:1px solid rgba(220,38,38,.3);border-radius:10px;padding:16px 20px;}
+.err-title{font-family:var(--ff-h);font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px;}
+.err-msg{font-family:var(--ff-m);font-size:11.5px;color:var(--muted);}
+
+/* LOCAL IMAGES */
+.local-img-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 22px;margin-bottom:20px;}
+.lim-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.lim-title{font-family:var(--ff-h);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);}
+.lim-subtitle{font-family:var(--ff-b);font-size:12px;color:var(--muted);margin-top:2px;}
+.btn-lim-refresh{font-family:var(--ff-m);font-size:10px;color:var(--cyan);background:var(--cyan-dim);border:1px solid rgba(2,132,199,.25);border-radius:5px;padding:5px 12px;cursor:pointer;transition:all .14s;}
+.btn-lim-refresh:hover{background:rgba(2,132,199,.16);}
+.lim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;}
+.lim-card{background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;cursor:pointer;transition:all .16s;position:relative;overflow:hidden;}
+.lim-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan);opacity:0;transition:opacity .16s;}
+.lim-card:hover{border-color:var(--cyan);box-shadow:0 3px 14px rgba(2,132,199,.12);transform:translateY(-1px);}
+.lim-card:hover::before,.lim-card.sel::before{opacity:1;}
+.lim-card.sel{border-color:var(--cyan);background:var(--cyan-dim);}
+.lim-repo{font-family:var(--ff-m);font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.lim-tag-chip{display:inline-block;font-family:var(--ff-m);font-size:9px;background:var(--cyan-dim);border:1px solid rgba(2,132,199,.22);color:var(--cyan);border-radius:3px;padding:1px 6px;margin-bottom:6px;}
+.lim-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.lim-meta span{font-family:var(--ff-m);font-size:10px;color:var(--dim);}
+.lim-state{text-align:center;padding:18px 12px;font-family:var(--ff-m);font-size:11px;color:var(--dim);}
+.lim-state.loading{color:var(--cyan);}
+@keyframes limPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.lim-state.loading{animation:limPulse 1.2s infinite;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- PAGE HEADER -->
+  <div class="ph">
+    <div class="ph-top">
+      <div class="ph-brand">
+        <div class="ph-logo">🔍</div>
+        <div>
+          <div class="ph-name">Container Sentinel</div>
+          <div class="ph-sub">Image Security Scanner</div>
+        </div>
+      </div>
+      <div class="ph-nav">
+        <a href="/">← Dashboard</a>
+        <a href="/report">Attack Report</a>
+        <a href="/logs">Run History</a>
+      </div>
+    </div>
+    <div class="ph-title">Docker Image Scanner</div>
+    <div class="ph-desc">AI-powered vulnerability analysis using Trivy. Enter any Docker image to get a comprehensive security assessment with CVE details, severity breakdown, misconfiguration detection, and industry-grade remediation guidance.</div>
+    <div class="ai-badge">◎ Powered by gpt-5.3-codex · Trivy Scanner</div>
+  </div>
+
+  <!-- SCAN INPUT -->
+  <div class="scan-input-wrap">
+    <div class="sil">Target Image</div>
+    <div class="input-row">
+      <input
+        class="scan-input"
+        id="img-input"
+        type="text"
+        placeholder="nginx:latest  ·  ubuntu:22.04  ·  python:3.11-slim  ·  registry.example.com/app:1.0"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="btn-scan" id="btn-scan" onclick="startScan()">Scan Image</button>
+    </div>
+    <div class="quick-picks">
+      <span class="qp-lbl">Quick picks:</span>
+      <button class="qp" onclick="setImage('nginx:latest')">nginx:latest</button>
+      <button class="qp" onclick="setImage('ubuntu:22.04')">ubuntu:22.04</button>
+      <button class="qp" onclick="setImage('python:3.11-slim')">python:3.11-slim</button>
+      <button class="qp" onclick="setImage('node:18-alpine')">node:18-alpine</button>
+      <button class="qp" onclick="setImage('redis:7-alpine')">redis:7-alpine</button>
+    </div>
+  </div>
+
+  <!-- LOCAL IMAGES -->
+  <div class="local-img-wrap">
+    <div class="lim-header">
+      <div>
+        <div class="lim-title">Your Docker Images</div>
+        <div class="lim-subtitle">Images built or pulled on this host — click to scan</div>
+      </div>
+      <button class="btn-lim-refresh" onclick="loadLocalImages()">↻ Refresh</button>
+    </div>
+    <div class="lim-grid" id="lim-grid">
+      <div class="lim-state loading">Loading local images...</div>
+    </div>
+  </div>
+
+  <!-- SCAN PROGRESS -->
+  <div id="scan-progress">
+    <div class="prog-card">
+      <div class="prog-title" id="prog-title">Initializing scan...</div>
+      <div class="prog-steps">
+        <div class="prog-step" id="step-pull"><span class="step-dot"></span>Pulling image metadata</div>
+        <div class="prog-step" id="step-vuln"><span class="step-dot"></span>Scanning for CVEs (CRITICAL, HIGH, MEDIUM, LOW)</div>
+        <div class="prog-step" id="step-misconfig"><span class="step-dot"></span>Detecting misconfigurations &amp; exposed secrets</div>
+        <div class="prog-step" id="step-ai"><span class="step-dot"></span>AI analysis — calculating risk score &amp; remediation</div>
+        <div class="prog-step" id="step-report"><span class="step-dot"></span>Compiling industry-grade security report</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCAN RESULTS -->
+  <div id="scan-results">
+
+    <!-- RISK BANNER -->
+    <div class="risk-banner" id="risk-banner">
+      <div class="risk-grid">
+        <div>
+          <div class="risk-level-lbl" id="r-level-lbl">—</div>
+          <div class="risk-score-big" id="r-score-big">—</div>
+          <div style="font-family:var(--ff-m);font-size:10px;color:var(--dim);margin-top:4px;">/ 10.0 Risk Score</div>
+        </div>
+        <div>
+          <div class="risk-image" id="r-image">—</div>
+          <div class="risk-exec" id="r-exec-summary">—</div>
+          <div class="risk-rationale" id="r-rationale">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEVERITY BREAKDOWN -->
+    <div class="sev-bars">
+      <div class="sev-bar s-critical">
+        <div class="sev-num" id="sv-critical">0</div>
+        <div class="sev-lbl">Critical</div>
+        <div class="sev-bar-track"><div class="sev-bar-fill" id="sb-critical" style="width:0%"></div></div>
+      </div>
+      <div class="sev-bar s-high">
+        <div class="sev-num" id="sv-high">0</div>
+        <div class="sev-lbl">High</div>
+        <div class="sev-bar-track"><div class="sev-bar-fill" id="sb-high" style="width:0%"></div></div>
+      </div>
+      <div class="sev-bar s-medium">
+        <div class="sev-num" id="sv-medium">0</div>
+        <div class="sev-lbl">Medium</div>
+        <div class="sev-bar-track"><div class="sev-bar-fill" id="sb-medium" style="width:0%"></div></div>
+      </div>
+      <div class="sev-bar s-low">
+        <div class="sev-num" id="sv-low">0</div>
+        <div class="sev-lbl">Low</div>
+        <div class="sev-bar-track"><div class="sev-bar-fill" id="sb-low" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- CVE TABLE -->
+    <div class="card a-red">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--red)">⚠</span>
+        <span class="ch-title">Vulnerability Details</span>
+        <div class="ch-right">
+          <span class="ch-count" id="cve-count">—</span>
+          <span id="secret-chip-wrap"></span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="cve-tbl">
+          <thead>
+            <tr>
+              <th style="width:160px">CVE ID</th>
+              <th style="width:90px">Severity</th>
+              <th style="width:70px">CVSS v3</th>
+              <th>Package</th>
+              <th style="width:130px">Installed</th>
+              <th style="width:130px">Fixed In</th>
+            </tr>
+          </thead>
+          <tbody id="cve-tbody">
+            <tr class="empty-row"><td colspan="6">No scan results yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MISCONFIGURATIONS -->
+    <div class="card a-amber" id="mc-card">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--amber)">⚙</span>
+        <span class="ch-title">Misconfigurations</span>
+        <div class="ch-right"><span class="ch-count" id="mc-count">—</span></div>
+      </div>
+      <div id="mc-body">
+        <div style="padding:16px;color:var(--dim);font-family:var(--ff-m);font-size:11px;text-align:center;">No misconfiguration data</div>
+      </div>
+    </div>
+
+    <!-- REMEDIATION -->
+    <div class="card a-green">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--green)">⚒</span>
+        <span class="ch-title">Remediation Priority</span>
+      </div>
+      <ul class="rem-list" id="rem-list">
+        <li><span class="rem-text" style="color:var(--dim)">Run a scan to see remediation recommendations</span></li>
+      </ul>
+    </div>
+
+    <!-- ROOT CAUSE ANALYSIS -->
+    <div class="card a-red" id="rca-card" style="display:none">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--red)">⬡</span>
+        <span class="ch-title">Root Cause Analysis</span>
+        <div class="ch-right">
+          <span class="ch-count" id="rca-count">—</span>
+          <span style="font-family:var(--ff-m);font-size:9px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;">AI Deep Dive · CRITICAL &amp; HIGH</span>
+        </div>
+      </div>
+      <ul class="rca-list" id="rca-list"></ul>
+    </div>
+
+    <!-- COMPLIANCE -->
+    <div class="card a-cyan">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--cyan)">⬡</span>
+        <span class="ch-title">Compliance Notes</span>
+        <div class="ch-right">
+          <span style="font-family:var(--ff-m);font-size:9px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;">CIS · NIST SP 800-190 · DISA STIG</span>
+        </div>
+      </div>
+      <div style="padding:16px 18px">
+        <div class="compliance-box" id="compliance-box">Run a scan to see compliance notes.</div>
+      </div>
+    </div>
+
+    <!-- SCAN META -->
+    <div class="scan-meta" id="scan-meta">
+      <span>🕐 Scan time: <strong id="m-ts">—</strong></span>
+      <span>📦 Total vulnerabilities: <strong id="m-total">—</strong></span>
+      <span>🔧 Fixable: <strong id="m-fixable">—</strong></span>
+    </div>
+
+  </div><!-- /#scan-results -->
+
+</div><!-- /.wrap -->
+
+<script>
+function setImage(img){
+  document.getElementById('img-input').value=img;
+  document.getElementById('img-input').focus();
+}
+
+document.getElementById('img-input').addEventListener('keydown',function(e){
+  if(e.key==='Enter')startScan();
+});
+
+const STEPS=['step-pull','step-vuln','step-misconfig','step-ai','step-report'];
+let stepTimer=null;
+
+function animateSteps(){
+  let i=0;
+  function advance(){
+    STEPS.forEach((s,idx)=>{
+      const el=document.getElementById(s);
+      if(idx<i)el.className='prog-step done';
+      else if(idx===i)el.className='prog-step active';
+      else el.className='prog-step';
+    });
+    const titles=['Pulling image metadata...','Scanning for vulnerabilities...','Checking misconfigurations...','AI analyzing findings...','Compiling report...'];
+    const t=document.getElementById('prog-title');
+    if(t)t.textContent=titles[Math.min(i,titles.length-1)];
+    if(i<STEPS.length-1){i++;stepTimer=setTimeout(advance,2800);}
+  }
+  advance();
+}
+
+async function startScan(){
+  const input=document.getElementById('img-input');
+  const image=input.value.trim();
+  if(!image){input.focus();input.style.borderColor='var(--red)';setTimeout(()=>{input.style.borderColor='';},1500);return;}
+
+  document.getElementById('scan-results').style.display='none';
+  document.getElementById('scan-progress').style.display='block';
+  document.getElementById('btn-scan').disabled=true;
+  input.disabled=true;
+  STEPS.forEach(s=>{document.getElementById(s).className='prog-step';});
+  if(stepTimer)clearTimeout(stepTimer);
+  animateSteps();
+
+  try{
+    const res=await fetch('/api/scan/image',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image}),
+    });
+    const data=await res.json();
+    if(stepTimer)clearTimeout(stepTimer);
+    STEPS.forEach(s=>{document.getElementById(s).className='prog-step done';});
+
+    setTimeout(()=>{
+      document.getElementById('scan-progress').style.display='none';
+      if(!res.ok){
+        showError(data.detail||'Scan failed');
+      }else{
+        populateResults(data);
+      }
+    },350);
+  }catch(e){
+    if(stepTimer)clearTimeout(stepTimer);
+    document.getElementById('scan-progress').style.display='none';
+    showError(e.message);
+  }finally{
+    document.getElementById('btn-scan').disabled=false;
+    input.disabled=false;
+  }
+}
+
+function showError(msg){
+  const el=document.getElementById('scan-results');
+  el.style.display='block';
+  el.innerHTML=`<div class="err-box"><div class="err-title">Scan Failed</div><div class="err-msg">${esc(msg)}</div></div>`;
+}
+
+function populateResults(d){
+  const el=document.getElementById('scan-results');
+  el.style.display='block';
+
+  // Risk banner
+  const risk=(d.risk_level||'UNKNOWN').toLowerCase();
+  const banner=document.getElementById('risk-banner');
+  banner.className='risk-banner risk-'+risk;
+  document.getElementById('r-level-lbl').textContent=d.risk_level||'UNKNOWN';
+  document.getElementById('r-score-big').textContent=d.risk_score!=null?d.risk_score.toFixed(1):'—';
+  document.getElementById('r-image').textContent=d.image||'—';
+  document.getElementById('r-exec-summary').textContent=d.executive_summary||'—';
+  document.getElementById('r-rationale').textContent=d.risk_score!=null?`Risk score: ${d.risk_score}/10`:'';
+
+  // Severity bars
+  const sc=d.severity_counts||{};
+  const total=d.total_vulnerabilities||0;
+  ['critical','high','medium','low'].forEach(s=>{
+    const n=sc[s.toUpperCase()]||0;
+    document.getElementById('sv-'+s).textContent=n;
+    document.getElementById('sb-'+s).style.width=total>0?Math.min(100,Math.round(n/total*100))+'%':'0%';
+  });
+
+  // CVE table
+  const tbody=document.getElementById('cve-tbody');
+  const cves=d.top_cves||[];
+  if(cves.length){
+    tbody.innerHTML='';
+    cves.forEach(c=>{
+      const sev=(c.severity||'unknown').toLowerCase();
+      const cvss=c.cvss_v3!=null?c.cvss_v3:null;
+      const cvssClass=cvss!=null?(cvss>=7?'cvss-high':cvss>=4?'cvss-medium':'cvss-low'):'';
+      const fixClass=c.fixed_version&&c.fixed_version!=='no fix available'?'fix-avail':'fix-none';
+      const tr=document.createElement('tr');
+      tr.innerHTML=
+        `<td><div class="cve-id">${esc(c.id)}</div>${c.title?`<div class="cve-title">${esc(c.title.slice(0,80))}</div>`:''}</td>`+
+        `<td><span class="sev-badge sb-${sev}">${esc(c.severity||'—')}</span></td>`+
+        `<td>${cvss!=null?`<span class="cvss-score ${cvssClass}">${cvss}</span>`:'<span style="color:var(--dim)">—</span>'}</td>`+
+        `<td><div class="pkg-name">${esc(c.package||'—')}</div></td>`+
+        `<td><div class="pkg-ver">${esc(c.installed_version||'—')}</div></td>`+
+        `<td><div class="${fixClass}">${esc(c.fixed_version||'no fix')}</div></td>`;
+      tbody.appendChild(tr);
+    });
+  }else{
+    tbody.innerHTML='<tr class="empty-row"><td colspan="6">No vulnerabilities detected</td></tr>';
+  }
+  document.getElementById('cve-count').textContent=`${total} total`;
+  const secrets=d.secrets_found||0;
+  document.getElementById('secret-chip-wrap').innerHTML=secrets>0?`<span class="secret-chip">⚠ ${secrets} Secret${secrets>1?'s':''} Exposed</span>`:'';
+
+  // Misconfigs
+  const mcs=d.misconfigs||[];
+  document.getElementById('mc-count').textContent=mcs.length+' found';
+  const mcBody=document.getElementById('mc-body');
+  if(mcs.length){
+    mcBody.innerHTML='';
+    mcs.forEach(m=>{
+      const sev=(m.severity||'low').toLowerCase();
+      const div=document.createElement('div');
+      div.className='mc-item';
+      div.innerHTML=
+        `<div class="mc-sev"><span class="sev-badge sb-${sev}">${esc(m.severity||'—')}</span></div>`+
+        `<div>`+
+        `<div class="mc-title">${esc(m.title||'')}</div>`+
+        `<div class="mc-id">${esc(m.id||'')} · ${esc(m.type||'')}</div>`+
+        `${m.description?`<div class="mc-desc">${esc(m.description)}</div>`:''}`+
+        `${m.resolution?`<div class="mc-res">→ ${esc(m.resolution)}</div>`:''}`+
+        `</div>`;
+      mcBody.appendChild(div);
+    });
+  }else{
+    mcBody.innerHTML='<div style="padding:16px;color:var(--green);font-family:var(--ff-m);font-size:11px;text-align:center;">✓ No misconfigurations detected</div>';
+  }
+
+  // Remediation
+  const remList=document.getElementById('rem-list');
+  const rems=d.remediation_priority||[];
+  if(rems.length){
+    remList.innerHTML='';
+    rems.forEach(r=>{
+      const li=document.createElement('li');
+      li.innerHTML=`<span class="rem-text">${esc(r)}</span>`;
+      remList.appendChild(li);
+    });
+  }else{
+    remList.innerHTML='<li><span class="rem-text" style="color:var(--green)">No critical remediations required.</span></li>';
+  }
+
+  // Compliance
+  const compBox=document.getElementById('compliance-box');
+  if(d.compliance_notes){
+    compBox.innerHTML=esc(d.compliance_notes).replace(/(CIS[^\s,]*|NIST[^\s,]*|DISA[^\s,]*|STIG)/g,'<strong>$1</strong>');
+  }else{
+    compBox.textContent='No compliance notes available.';
+  }
+
+  // Root Cause Analysis
+  const rcaCard=document.getElementById('rca-card');
+  const rcaList=document.getElementById('rca-list');
+  const analyses=d.cve_analysis||[];
+  if(analyses.length){
+    rcaCard.style.display='';
+    document.getElementById('rca-count').textContent=analyses.length+' CVEs analysed';
+    rcaList.innerHTML='';
+    analyses.forEach((a,idx)=>{
+      const sev=(a.severity||'high').toLowerCase();
+      const urg=(a.urgency||'routine').toLowerCase().replace(/\s+/g,'-');
+      const urgLabel={'immediate':'IMMEDIATE','within-30-days':'30 DAYS','routine':'ROUTINE'}[urg]||urg.toUpperCase();
+      const urgCls='ub-'+urg;
+      const li=document.createElement('li');
+      li.className='rca-item';
+      li.innerHTML=
+        `<div class="rca-header" id="rca-h-${idx}" onclick="toggleRca(${idx})">`+
+          `<span class="sev-badge sb-${sev}" style="flex-shrink:0">${esc(a.severity||'?')}</span>`+
+          `<span class="rca-cve-id">${esc(a.id)}</span>`+
+          `<span class="rca-pkg">${esc(a.package||'')}</span>`+
+          `<span class="urgency-badge ${urgCls}">${urgLabel}</span>`+
+          `<span class="rca-chevron">▼</span>`+
+        `</div>`+
+        `<div class="rca-body" id="rca-b-${idx}">`+
+          `<div class="rca-section">`+
+            `<div class="rca-section-label">Root Cause</div>`+
+            `<div class="rca-text">${esc(a.root_cause||'—')}</div>`+
+          `</div>`+
+          `<div class="rca-section">`+
+            `<div class="rca-section-label">Attack Scenario</div>`+
+            `<div class="rca-text">${esc(a.attack_scenario||'—')}</div>`+
+          `</div>`+
+          (a.exact_fix?
+          `<div class="rca-section">`+
+            `<div class="rca-section-label">Exact Fix Command</div>`+
+            `<div class="rca-fix-box">`+
+              `<span class="rca-fix-cmd">${esc(a.exact_fix)}</span>`+
+              `<button class="btn-copy-fix" id="cp-${idx}" onclick="copyFix(event,${idx},'${escAttr(a.exact_fix)}')">Copy</button>`+
+            `</div>`+
+          `</div>`:'')+
+          (a.dockerfile_fix?
+          `<div class="rca-section">`+
+            `<div class="rca-section-label">Dockerfile Remediation</div>`+
+            `<div class="rca-dockerfile"><div class="df-label">Dockerfile</div>${esc(a.dockerfile_fix)}</div>`+
+          `</div>`:'')+
+        `</div>`;
+      rcaList.appendChild(li);
+    });
+  }else{
+    rcaCard.style.display='none';
+  }
+
+  // Scan meta
+  document.getElementById('m-ts').textContent=(d.scan_timestamp||'').replace('T',' ').slice(0,19)+' UTC';
+  document.getElementById('m-total').textContent=total;
+  document.getElementById('m-fixable').textContent=d.fixable_count!=null?String(d.fixable_count):'—';
+}
+
+function toggleRca(idx){
+  const h=document.getElementById('rca-h-'+idx);
+  const b=document.getElementById('rca-b-'+idx);
+  const open=b.classList.contains('open');
+  b.classList.toggle('open',!open);
+  h.classList.toggle('open',!open);
+}
+
+function copyFix(e,idx,txt){
+  e.stopPropagation();
+  navigator.clipboard.writeText(txt).then(()=>{
+    const btn=document.getElementById('cp-'+idx);
+    btn.textContent='Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},1800);
+  });
+}
+
+function escAttr(s){return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function loadLocalImages(){
+  const grid=document.getElementById('lim-grid');
+  grid.innerHTML='<div class="lim-state loading">Loading local images...</div>';
+  try{
+    const res=await fetch('/api/scan/local-images');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const imgs=await res.json();
+    if(!Array.isArray(imgs)||!imgs.length){
+      grid.innerHTML='<div class="lim-state">No local Docker images found.<br>Build or pull an image to see it here.</div>';
+      return;
+    }
+    grid.innerHTML='';
+    imgs.forEach(img=>{
+      const card=document.createElement('div');
+      card.className='lim-card';
+      card.title='Click to scan '+esc(img.name);
+      card.onclick=()=>{
+        setImage(img.name);
+        document.querySelectorAll('.lim-card').forEach(c=>c.classList.remove('sel'));
+        card.classList.add('sel');
+      };
+      const shortRepo=img.repository.split('/').pop();
+      card.innerHTML=
+        `<div class="lim-repo" title="${esc(img.name)}">${esc(shortRepo)}</div>`+
+        `<div><span class="lim-tag-chip">${esc(img.tag)}</span></div>`+
+        `<div class="lim-meta">`+
+          `<span>⬡ ${esc(img.id)}</span>`+
+          `<span>⊙ ${esc(img.size)}</span>`+
+          `<span>⌚ ${esc(img.created)}</span>`+
+        `</div>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    grid.innerHTML=`<div class="lim-state" style="color:var(--red)">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+loadLocalImages();
+</script>
+</body>
+</html>

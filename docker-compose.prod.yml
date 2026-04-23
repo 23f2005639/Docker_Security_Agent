@@ -1,0 +1,145 @@
+# Container Sentinel - Production Deployment
+# Usage: docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+
+  # === Reverse Proxy (HTTPS + Basic Auth) ===
+  nginx-proxy:
+    image: nginx:stable-alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+      - ./deploy/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - sentinel-app
+    networks:
+      - proxy_net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  # === FastAPI Application ===
+  sentinel-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinel-app
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - nginx-target
+      - flask-target
+      - redis-target
+      - attacker
+    networks:
+      - proxy_net
+      - sentinel_net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g   # AI agents (openai-agents SDK) are the heaviest consumer
+
+  # === Falco Runtime Security (modern_ebpf — no QEMU needed on real Linux kernel) ===
+  falco:
+    image: falcosecurity/falco:latest
+    container_name: falco
+    privileged: true
+    pid: "host"
+    command: ["falco", "-o", "engine.kind=modern_ebpf", "-c", "/etc/falco/falco.yaml"]
+    volumes:
+      - ./docker/falco/falco-prod.yaml:/etc/falco/falco.yaml:ro
+      - ./docker/falco/rules.yaml:/etc/falco/rules.d/sentinel_rules.yaml:ro
+      - /sys/kernel/tracing:/sys/kernel/tracing:ro
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+    depends_on:
+      - sentinel-app
+    networks:
+      - proxy_net
+      - sentinel_net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # === Vulnerable Targets (internal only, NO ports exposed to host) ===
+  nginx-target:
+    image: nginx:1.19.0
+    container_name: nginx-target
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      sentinel_net:
+        ipv4_address: 172.20.0.2
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  flask-target:
+    build: ./docker/flask-target
+    container_name: flask-target
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    cap_add:
+      - SYS_ADMIN
+      - NET_RAW
+      - SYS_PTRACE
+    networks:
+      sentinel_net:
+        ipv4_address: 172.20.0.3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  redis-target:
+    image: redis:5.0
+    container_name: redis-target
+    command: redis-server --protected-mode no --maxmemory 128mb --maxmemory-policy allkeys-lru
+    networks:
+      sentinel_net:
+        ipv4_address: 172.20.0.4
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 192m
+
+  attacker:
+    build: ./docker/attacker
+    container_name: attacker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: tail -f /dev/null
+    networks:
+      sentinel_net:
+        ipv4_address: 172.20.0.5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m  # DoS attack spawns subprocesses — capped to prevent host freeze
+
+networks:
+  proxy_net:
+    driver: bridge
+  sentinel_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
