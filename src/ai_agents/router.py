@@ -189,3 +189,34 @@ async def trigger_dos_monitor():
         return {"status": "ok", "result": output}
     except Exception as exc:
         return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@router.post("/api/agents/analyze/{run_id}")
+async def analyze_attack_run(run_id: str):
+    from attacks.router import _history
+    from ai_agents.orchestrator import run_analysis
+
+    run = next((r for r in _history if r.id == run_id), None)
+    if not run:
+        return JSONResponse(status_code=404, content={"detail": "Run not found"})
+    if run.status == "running":
+        return JSONResponse(status_code=409, content={"detail": "Attack still running"})
+
+    async def do_analysis():
+        async def status_cb(agent, state, summary=None):
+            await broadcast_agent_msg({"type": "agent_status", "agent": agent, "state": state, "summary": summary})
+
+        try:
+            await broadcast_agent_msg({"type": "agent_status", "agent": "orchestrator", "state": "RUNNING"})
+            report = await run_analysis(run.attack_type, run.output, status_callback=status_cb)
+            _findings.append(report)
+            await broadcast_agent_msg({"type": "finding", "data": report})
+            await broadcast_agent_msg({"type": "agent_status", "agent": "orchestrator", "state": "DONE"})
+        except Exception as exc:
+            await broadcast_agent_msg({
+                "type": "agent_status", "agent": "orchestrator",
+                "state": "ERROR", "summary": str(exc),
+            })
+
+    asyncio.create_task(do_analysis())
+    return {"status": "started", "run_id": run_id, "attack_type": run.attack_type}

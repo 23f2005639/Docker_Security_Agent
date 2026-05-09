@@ -318,6 +318,20 @@ body::after{
 .f-ai-risk{color:var(--red);}
 .f-ai-act {color:var(--falco);}
 
+/* ── Analyze Button ────────────────────────────────────────── */
+.btn-anlz{
+  font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.06em;padding:7px 14px;
+  border-radius:4px;border:1px solid rgba(2,132,199,.35);background:rgba(2,132,199,.08);
+  color:var(--falco);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
+}
+.btn-anlz:hover{background:rgba(2,132,199,.16);border-color:rgba(2,132,199,.55);box-shadow:0 2px 10px rgba(2,132,199,.18);}
+.btn-anlz:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── Orch Status ───────────────────────────────────────────── */
+#orch-status{font-family:var(--ff-m);font-size:13px;color:var(--muted);padding:8px 0;}
+#orch-status.done{color:var(--atk);}
+#orch-status.error{color:var(--red);}
+
 /* ── Buttons SM ────────────────────────────────────────────── */
 .btn-sm{
   font-family:var(--ff-m);font-size:11px;font-weight:600;letter-spacing:.06em;padding:4px 11px;
@@ -611,6 +625,7 @@ body::after{
             <div class="ar-status" id="s-docker-socket">READY</div>
           </div>
           <button class="btn-exec" id="btn-docker-socket" onclick="fireAttack('docker-socket','docker_socket')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-docker_socket" style="display:none" onclick="analyzeAttack('docker_socket')">⚙ Analyze</button>
         </div>
         <div class="ar" id="row-nsenter-escape">
           <div class="ar-num">II</div>
@@ -620,6 +635,7 @@ body::after{
             <div class="ar-status" id="s-nsenter-escape">READY</div>
           </div>
           <button class="btn-exec" id="btn-nsenter-escape" onclick="fireAttack('nsenter-escape','nsenter_escape')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-nsenter_escape" style="display:none" onclick="analyzeAttack('nsenter_escape')">⚙ Analyze</button>
         </div>
         <div class="ar" id="row-lateral-redis">
           <div class="ar-num">III</div>
@@ -629,6 +645,7 @@ body::after{
             <div class="ar-status" id="s-lateral-redis">READY</div>
           </div>
           <button class="btn-exec" id="btn-lateral-redis" onclick="fireAttack('lateral-redis','lateral_redis')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-lateral_redis" style="display:none" onclick="analyzeAttack('lateral_redis')">⚙ Analyze</button>
         </div>
         <div class="ar" id="row-runc-cve">
           <div class="ar-num">IV</div>
@@ -638,6 +655,7 @@ body::after{
             <div class="ar-status" id="s-runc-cve">READY</div>
           </div>
           <button class="btn-exec" id="btn-runc-cve" onclick="fireAttack('runc-cve-2025','runc_cve')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-runc_cve" style="display:none" onclick="analyzeAttack('runc_cve')">⚙ Analyze</button>
         </div>
         <div class="ar" id="row-authz-bypass">
           <div class="ar-num">V</div>
@@ -650,6 +668,7 @@ body::after{
             <div class="ar-status" id="s-authz-bypass">READY</div>
           </div>
           <button class="btn-exec" id="btn-authz-bypass" onclick="fireAttack('authz-bypass-2026','authz_bypass')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-authz_bypass" style="display:none" onclick="analyzeAttack('authz_bypass')">⚙ Analyze</button>
         </div>
         <div class="ar" id="row-dos-attack">
           <div class="ar-num">VI</div>
@@ -659,6 +678,7 @@ body::after{
             <div class="ar-status" id="s-dos-attack">READY</div>
           </div>
           <button class="btn-exec" id="btn-dos-attack" onclick="fireAttack('dos-attack','dos_attack')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-dos_attack" style="display:none" onclick="analyzeAttack('dos_attack')">⚙ Analyze</button>
         </div>
         <div class="ar" id="row-supply-chain-attack">
           <div class="ar-num">VII</div>
@@ -668,6 +688,7 @@ body::after{
             <div class="ar-status" id="s-supply-chain-attack">READY</div>
           </div>
           <button class="btn-exec" id="btn-supply-chain-attack" onclick="fireAttack('supply-chain-attack','supply_chain_attack')">Execute</button>
+          <button class="btn-anlz" id="btn-anlz-supply_chain_attack" style="display:none" onclick="analyzeAttack('supply_chain_attack')">⚙ Analyze</button>
         </div>
       </div>
     </div>
@@ -701,6 +722,21 @@ body::after{
         <div id="falco-box">
           <div id="falco-empty">No alerts yet. Run an attack to see Falco detections.</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ORCHESTRATOR ANALYSIS -->
+    <div class="card a-falco" id="orch-analysis-box" style="display:none;margin-bottom:14px;">
+      <div class="ch">
+        <span class="ch-icon" style="color:var(--falco)">⬧</span>
+        <span class="ch-title">Orchestrator Analysis</span>
+        <div class="ch-right">
+          <span style="font-family:var(--ff-m);font-size:9px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;">Scanner · Monitor · Network → Reporter</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="orch-status">⚙ Agents running…</div>
+        <div id="orch-body"></div>
       </div>
     </div>
 
@@ -820,27 +856,87 @@ function appendLine(text){
 
 /* Attack fire/poll */
 let activeAttackKey=null;
+const attRunIds={};
 async function fireAttack(endpoint,key){
   if(activeAttackKey){appendLine('[!] An attack is already running. Wait for it to finish.');return;}
   const btnKey=key.replace(/_/g,'-');
   const btn=document.getElementById('btn-'+btnKey);
   const statusEl=document.getElementById('s-'+btnKey);
   btn.disabled=true;btn.classList.add('running');btn.textContent='Running…';statusEl.textContent='RUNNING...';activeAttackKey=key;
+  const anlzBtn=document.getElementById('btn-anlz-'+key);
+  if(anlzBtn)anlzBtn.style.display='none';
   try{
-    const res=await fetch(`/api/attacks/${endpoint}`,{method:'POST'});const data=await res.json();
-    if(res.ok){statusEl.textContent=`LAUNCHED  id=${data.id}`;pollStatus(data.id,btn,statusEl,key);}
+    const res=await fetch('/api/attacks/'+endpoint,{method:'POST'});const data=await res.json();
+    if(res.ok){statusEl.textContent='LAUNCHED  id='+data.id;pollStatus(data.id,btn,statusEl,key);}
     else{throw new Error(data.detail||'Launch failed');}
   }catch(e){appendLine('[!] ERROR: '+e.message);resetBtn(btn,statusEl,key);}
 }
 function pollStatus(runId,btn,statusEl,key){
   const iv=setInterval(async()=>{
     try{
-      const res=await fetch(`/api/attacks/history/${runId}`);const data=await res.json();
-      if(data.status!=='running'){clearInterval(iv);statusEl.textContent=`${data.status.toUpperCase()}  exit=${data.exit_code}  ${data.duration_seconds?.toFixed(1)}s`;resetBtn(btn,statusEl,key);}
+      const res=await fetch('/api/attacks/history/'+runId);const data=await res.json();
+      if(data.status!=='running'){
+        clearInterval(iv);
+        statusEl.textContent=data.status.toUpperCase()+'  exit='+data.exit_code+'  '+(data.duration_seconds?.toFixed(1)||'?')+'s';
+        resetBtn(btn,statusEl,key);
+        attRunIds[key]=runId;
+        const anlzBtn=document.getElementById('btn-anlz-'+key);
+        if(anlzBtn){anlzBtn.style.display='';anlzBtn.disabled=false;anlzBtn.textContent='⚙ Analyze';}
+      }
     }catch(e){clearInterval(iv);resetBtn(btn,statusEl,key);}
   },1000);
 }
 function resetBtn(btn,statusEl,key){btn.disabled=false;btn.classList.remove('running');btn.textContent='Execute';activeAttackKey=null;}
+
+/* Orchestrator Analysis */
+async function analyzeAttack(key){
+  const runId=attRunIds[key];
+  if(!runId){appendLine('[!] No completed run to analyze — run the attack first.');return;}
+  const btn=document.getElementById('btn-anlz-'+key);
+  btn.disabled=true;btn.textContent='⚙ Running…';
+  const box=document.getElementById('orch-analysis-box');
+  box.style.display='';
+  const st=document.getElementById('orch-status');
+  st.className='';st.textContent='⚙ Orchestrator agents running… (Scanner · Monitor · Network → Reporter)';
+  const body=document.getElementById('orch-body');
+  body.replaceChildren();
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const res=await fetch('/api/agents/analyze/'+runId,{method:'POST'});
+    if(!res.ok){
+      const d=await res.json();
+      st.textContent='✗ '+(d.detail||'Failed');
+      btn.disabled=false;btn.textContent='⚙ Analyze';
+    }
+  }catch(e){
+    st.textContent='✗ '+e.message;
+    btn.disabled=false;btn.textContent='⚙ Analyze';
+  }
+}
+function renderOrchFinding(data){
+  const body=document.getElementById('orch-body');
+  if(!body)return;
+  body.replaceChildren();
+  const sev=data.overall_severity||'—';
+  const findings=data.findings||{};
+  const rep=findings.reporter||{};
+  const net=findings.network||{};
+  function makeRow(lbl,val,cls){
+    const row=document.createElement('div');row.className='frow';
+    const l=document.createElement('span');l.className='flbl';l.textContent=lbl;
+    const v=document.createElement('span');v.className='fval'+(cls?' '+cls:'');v.textContent=val;
+    row.appendChild(l);row.appendChild(v);return row;
+  }
+  const fbox=document.createElement('div');fbox.className='fbox';
+  fbox.appendChild(makeRow('Attack',data.attack_label||data.attack_type||'—',''));
+  fbox.appendChild(makeRow('Severity',sev+(data.cvss_score!=null?' (CVSS '+data.cvss_score+')':''),'severity-'+sev.toLowerCase()));
+  if(data.mitre_ttp)fbox.appendChild(makeRow('MITRE TTP',data.mitre_ttp,''));
+  if(data.mitre_tactic)fbox.appendChild(makeRow('Tactic',data.mitre_tactic,''));
+  if(rep.root_cause)fbox.appendChild(makeRow('Root Cause',rep.root_cause,''));
+  if(net.pivot_path)fbox.appendChild(makeRow('Pivot Path',net.pivot_path,''));
+  if(rep.remediation)fbox.appendChild(makeRow('Remediation',rep.remediation,''));
+  body.appendChild(fbox);
+}
 
 /* Agent WebSocket */
 let agentWs=null,activeAgents=0;
@@ -859,20 +955,32 @@ connectAgentWS();
 function handleAgentStatus(msg){
   const stateEl=document.getElementById('state-'+msg.agent);
   const sumEl=document.getElementById('summary-'+msg.agent);
-  if(!stateEl)return;
-  stateEl.textContent=msg.state;stateEl.className='ag-state '+msg.state.toLowerCase();
+  if(stateEl){stateEl.textContent=msg.state;stateEl.className='ag-state '+msg.state.toLowerCase();}
   if(msg.summary&&sumEl)sumEl.textContent=msg.summary.slice(0,120);
   activeAgents=document.querySelectorAll('.ag-state.running').length;
-  document.getElementById('ov-agents-active').textContent=activeAgents;
-  document.getElementById('ov-agents-sub').textContent=activeAgents>0?'Running':'Idle';
+  const agActive=document.getElementById('ov-agents-active');if(agActive)agActive.textContent=activeAgents;
+  const agSub=document.getElementById('ov-agents-sub');if(agSub)agSub.textContent=activeAgents>0?'Running':'Idle';
+  /* update orchestrator status panel */
+  const st=document.getElementById('orch-status');
+  if(st&&msg.agent==='orchestrator'){
+    if(msg.state==='RUNNING'){st.className='';st.textContent='⚙ Orchestrator running…';}
+    else if(msg.state==='DONE'){st.className='done';st.textContent='✓ Analysis complete.';}
+    else if(msg.state==='ERROR'){st.className='error';st.textContent='✗ '+(msg.summary||'Error');}
+  }
+  if(msg.state==='DONE'||msg.state==='ERROR'){
+    document.querySelectorAll('.btn-anlz').forEach(b=>{b.disabled=false;b.textContent='⚙ Analyze';});
+  }
 }
 function handleFinding(data){
   const sev=data.overall_severity||'UNKNOWN';
   const sevEl=document.getElementById('f-severity');
-  if(sevEl){sevEl.textContent=sev+(data.cvss_score?` (CVSS ${data.cvss_score})`:'');sevEl.className='fval severity-'+sev.toLowerCase();}
+  if(sevEl){sevEl.textContent=sev+(data.cvss_score?' (CVSS '+data.cvss_score+')':'');sevEl.className='fval severity-'+sev.toLowerCase();}
   setText('f-ttp',data.mitre_ttp||'—');setText('f-tactic',data.mitre_tactic||'—');setText('f-cvss',data.cvss_score!=null?String(data.cvss_score):'—');
   const net=(data.findings||{}).network||{};setText('f-pivot',net.pivot_path||'—');setText('f-breach',net.host_breach?'YES':'NO');
   const rep=(data.findings||{}).reporter||{};setText('f-root',rep.root_cause||'—');setText('f-fix',rep.remediation||'—');
+  /* render visible orchestrator panel */
+  renderOrchFinding(data);
+  const box=document.getElementById('orch-analysis-box');if(box)box.style.display='';
 }
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 

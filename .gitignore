@@ -14,3 +14,4 @@ dist/
 build/
 deploy/ssl/
 deploy/.htpasswd
+.claude/
